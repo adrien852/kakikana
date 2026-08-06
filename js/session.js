@@ -187,12 +187,12 @@
       const w = kanji.w[0];
       target = w[1]; display = w[0];
       accepts = [w[0], w[1], w[2]];
-    } else if (kana && kana.ex && kana.ex.jp.length > 1 && Math.random() < 0.5) {
-      target = kana.ex.jp; display = kana.ex.jp;
-      accepts = [kana.ex.jp, kana.ex.r];
     } else {
-      target = ch; display = ch;
-      accepts = [ch, kana ? kana.r : ""];
+      // never a bare kana: too short to recognise, so always its example word
+      const ex = Engine.kanaVoiceWord(ch);
+      if (!ex) { idx++; return next(); }
+      target = ex.jp; display = ex.jp;
+      accepts = [ex.jp, ex.r];
     }
 
     let attempts = 0;

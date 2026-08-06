@@ -54,6 +54,15 @@
   HIRA_ALL.concat(KATA_ALL).forEach(k => KANA_MAP[k.k] = k);
   window.KANA.hiragana.small.concat(window.KANA.katakana.small).forEach(k => KANA_MAP[k.k] = k);
 
+  // A single kana is one mora — far too short for any recogniser to identify
+  // reliably ("お" comes back as anything). Kana pronunciation is therefore only
+  // ever practised through a real example word.
+  function kanaVoiceWord(ch) {
+    const k = KANA_MAP[ch];
+    if (!k || !k.ex || !k.ex.jp) return null;
+    return [...k.ex.jp].length > 1 ? k.ex : null;
+  }
+
   // ---- dictation ----------------------------------------------------------
   // Kana that cannot be dictated safely: identical-sounding pairs and characters
   // with no sound of their own.
@@ -334,7 +343,7 @@
     // 5) voice items on well-known chars
     if (S.settings.voiceOn && window.Voice && window.Voice.anyEngineMaybe()) {
       const cands = items
-        .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2)
+        .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2 && kanaVoiceWord(i.ch))
         .map(i => i.ch);
       shuffle(cands).slice(0, 2).forEach(ch => items.push({ type: "voice", ch }));
     }
@@ -444,7 +453,7 @@
     save, P, status, charType,
     KANJI, KANJI_MAP, KANA_MAP, HIRA_BASE, HIRA_ALL, KATA_BASE, KATA_ALL,
     recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
-    dictationInfo, dictationMode,
+    dictationInfo, dictationMode, kanaVoiceWord,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, trackStats, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll

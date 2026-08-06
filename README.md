@@ -38,6 +38,10 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.5.1
+
+- **No more pronunciation checks on a single kana.** One mora ("お", "え") is too short for any recogniser to identify, so those attempts failed even when they were perfect. Kana pronunciation is now only ever practised through a real example word (あさ, いぬ, アイス…) — in sessions and in the library. The 🔊 listen button on a character is unchanged, and kana dictation (hearing a character and writing it) is unaffected.
+
 ## What's new in v1.5.0
 
 - **Dictation exercise.** From time to time a character arrives as sound only: you hear it, nothing is shown, and you write it. It replaces the usual prompt for that encounter rather than adding a step, and only appears once a character is solid (SRS stage 3+), alternating with the visual prompt so both directions keep being practised. Works for hiragana, katakana (the prompt says which script) and kanji.

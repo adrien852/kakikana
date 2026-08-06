@@ -121,7 +121,6 @@
   }
   // characters recognizers add or drop without changing the pronunciation heard
   const loose = s => s.replace(/[っゃゅょぁぃぅぇぉー]/g, "");
-  const isKana = c => { const n = c.codePointAt(0); return n >= 0x3040 && n <= 0x30ff; };
 
   // expected: array of acceptable strings (kana, kanji spelling, romaji)
   function matches(heardRaw, expected) {
@@ -146,10 +145,6 @@
       // forgive long-vowel / small-kana notation slips in longer words ("コーヒ" for
       // コーヒー), never in short ones where they carry the meaning (ちず ≠ チーズ).
       if (e.length >= 4 && loose(bare) === loose(e)) return true;
-      // one-mora kana targets: accept the syllable held or doubled ("あー", "ああ"),
-      // since recognizers seldom return a bare mora — but not another word.
-      if (e.length === 1 && isKana(e) && bare.length === 2 && bare[0] === e &&
-          "あいうえおー".indexOf(bare[1]) >= 0) return true;
     }
     return false;
   }

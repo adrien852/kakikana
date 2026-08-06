@@ -130,14 +130,15 @@
     const st = Engine.status(ch);
     const p = Engine.state.chars[ch];
     const canDraw = !!window.STROKES[ch];
-    const canSay = ch !== "ー";
+    // pronunciation practice needs a word: one mora on its own is not recognisable
+    const canPractise = !!Engine.kanaVoiceWord(ch);
     const lang = Engine.state.lang;
     const exHtml = k.ex ? `
       <div class="kv"><div class="k">${t("ex_word")}</div>
         <div class="word-row"><div class="word-jp jp">${k.ex.jp}</div>
           <div class="word-info"><div class="word-sub">${k.ex.r} — ${lang === "fr" ? k.ex.fr : k.ex.en}</div></div>
           <button class="speak-btn" style="width:40px;height:40px;font-size:18px" data-say="${k.ex.jp}">🔊</button>
-          ${micBtn([k.ex.jp, k.ex.r])}
+          ${canPractise ? micBtn([k.ex.jp, k.ex.r]) : ""}
         </div></div>` : "";
     const originHtml = k.origin ? `<div class="kv"><div class="k">${t("origin_kana")}</div><div class="v jp">${k.origin}</div></div>` : "";
     App.modal(`
@@ -146,13 +147,10 @@
         <div class="detail-meta">
           <div class="detail-romaji">${k.r}</div>
           <div class="detail-fr"><span class="pill ${st}">${t("status_" + st)}</span></div>
-          <div class="mt8" style="display:flex;gap:8px;align-items:center">
-            <button class="btn secondary small" data-say="${ch}">🔊 ${t("listen")}</button>
-            ${canSay ? micBtn([ch, k.r]) : ""}
-          </div>
+          <button class="btn secondary small mt8" data-say="${ch}">🔊 ${t("listen")}</button>
         </div>
       </div>
-      <div class="muted" style="font-size:12.5px;margin-top:8px">${Voice.anyEngineMaybe() ? t("practice_hint") : ""}</div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">${canPractise && Voice.anyEngineMaybe() ? t("practice_hint_word") : ""}</div>
       ${originHtml}${exHtml}
       ${p ? `<div class="kv"><div class="k">${t("progress")}</div><div class="v">${p.succ || 0} ✓ · ${p.fail || 0} ✗ · ${p.unaided || 0} ${t("stats_mastered")}</div></div>` : ""}
       ${st !== "mastered" ? `<button class="btn secondary mt8" id="d-known">${t("mark_known")}</button>`
