@@ -5,9 +5,12 @@
   let master = null;
   let unlocked = false;
 
-  function enabled() {
-    const s = window.Engine && Engine.state && Engine.state.settings;
-    return !s || s.sfx !== false;   // default on
+  function settings() { return (window.Engine && Engine.state && Engine.state.settings) || {}; }
+  function enabled() { return settings().sfx !== false; }        // default on
+  // 0–100 in the UI → a gentle master gain
+  function level() {
+    const v = settings().sfxVolume;
+    return 0.45 * ((v === undefined ? 50 : v) / 100);
   }
 
   function ac() {
@@ -16,7 +19,7 @@
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.22;       // keep everything gentle
+    master.gain.value = level();
     master.connect(ctx.destination);
     return ctx;
   }
@@ -37,6 +40,7 @@
     const c = ac();
     if (!c || !enabled()) return;
     if (c.state === "suspended") c.resume().catch(() => {});
+    master.gain.value = level();
     const o = opts || {};
     const t0 = c.currentTime + (o.delay || 0);
     const dur = o.dur || 0.18;
@@ -57,6 +61,7 @@
   function noise(opts) {
     const c = ac();
     if (!c || !enabled()) return;
+    master.gain.value = level();
     const o = opts || {};
     const dur = o.dur || 0.09;
     const frames = Math.floor(c.sampleRate * dur);
@@ -108,6 +113,8 @@
     start() { tone(N.D5, { dur: 0.12, gain: 0.22 }); tone(N.A5, { dur: 0.18, gain: 0.18, delay: 0.07 }); },
     // library: character opened
     pop() { tone(N.B4, { dur: 0.08, gain: 0.14 }); },
+    // preview used by the volume slider
+    sample() { tone(N.G5, { dur: 0.14, gain: 0.30 }); tone(N.D6, { dur: 0.20, gain: 0.22, delay: 0.08 }); },
     unlock
   };
 

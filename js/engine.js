@@ -8,9 +8,10 @@
     ver: 1,
     lang: "fr",
     onboarded: false,
-    settings: { activeKanji: 3, masteryReps: 5, minDays: 3, strict: "normal", voiceOn: true, ttsSlow: false, whisper: false, sfx: true },
+    settings: { activeKanji: 3, masteryReps: 5, minDays: 3, strict: "normal", voiceOn: true, ttsSlow: false, whisper: false, sfx: true, sfxVolume: 50 },
     chars: {},        // per-char progress
     kanjiActive: [],  // kanji currently in practice
+    kanjiWanted: [],  // kanji the user asked to learn next (jump the queue)
     kanjiOrder: [],   // chars in the order they entered practice/known
     exams: [],
     streak: { last: null, count: 0 }
@@ -141,19 +142,55 @@
   function katakanaUnlocked() { return true; }
   function kanjiUnlocked() { return true; }
 
-  function refillActiveKanji() {
+  function isDone(ch) { const p = S.chars[ch]; return !!(p && (p.mastered || p.known)); }
+
+  // Kanji the user asked for come first, in the order they asked, then the
+  // standard frequency order.
+  function learnQueue() {
+    const q = S.kanjiWanted.filter(c => KANJI_MAP[c] && !isDone(c));
+    for (const k of KANJI) if (!isDone(k.k) && q.indexOf(k.k) < 0) q.push(k.k);
+    return q;
+  }
+
+  function refillActiveKanji(reprioritize) {
     const max = S.settings.activeKanji;
-    for (const k of KANJI) {
+    if (reprioritize) {
+      // make room for newly requested kanji by dropping ones not started yet
+      const pending = S.kanjiWanted.filter(c => !isDone(c) && S.kanjiActive.indexOf(c) < 0).length;
+      if (pending) {
+        for (const c of S.kanjiActive.slice()) {
+          if (S.kanjiActive.length + pending <= max) break;
+          const p = S.chars[c];
+          if (S.kanjiWanted.indexOf(c) < 0 && (!p || p.enc === 0)) {
+            S.kanjiActive = S.kanjiActive.filter(x => x !== c);
+          }
+        }
+      }
+    }
+    for (const ch of learnQueue()) {
       if (S.kanjiActive.length >= max) break;
-      const p = S.chars[k.k];
-      const done = p && (p.mastered || p.known);
-      if (!done && !S.kanjiActive.includes(k.k)) {
-        S.kanjiActive.push(k.k);
-        if (!S.kanjiOrder.includes(k.k)) S.kanjiOrder.push(k.k);
+      if (S.kanjiActive.indexOf(ch) < 0) {
+        S.kanjiActive.push(ch);
+        if (S.kanjiOrder.indexOf(ch) < 0) S.kanjiOrder.push(ch);
       }
     }
     save();
   }
+
+  // "I want to learn this one next" — priority, not a claim of knowing it.
+  function wantKanji(ch, val) {
+    S.kanjiWanted = S.kanjiWanted.filter(c => c !== ch);
+    if (val) {
+      S.kanjiWanted.push(ch);
+    } else {
+      // never started yet → step back out of the active list, keep progress otherwise
+      const p = S.chars[ch];
+      if (!p || p.enc === 0) S.kanjiActive = S.kanjiActive.filter(c => c !== ch);
+    }
+    refillActiveKanji(true);
+    save();
+  }
+  function isWanted(ch) { return S.kanjiWanted.indexOf(ch) >= 0; }
 
   // next new kana to introduce in a syllabary (path = base then dakuten)
   function nextNewKana(sy, n) {
@@ -244,7 +281,9 @@
 
     // 5) voice items on well-known chars
     if (S.settings.voiceOn && window.Voice && window.Voice.anyEngineMaybe()) {
-      const cands = items.filter(i => i.type === "draw" && P(i.ch).stage >= 2 && !i._voiced).map(i => i.ch);
+      const cands = items
+        .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2)
+        .map(i => i.ch);
       shuffle(cands).slice(0, 2).forEach(ch => items.push({ type: "voice", ch }));
     }
 
@@ -329,7 +368,7 @@
     get state() { return S; },
     save, P, status, charType,
     KANJI, KANJI_MAP, KANA_MAP, HIRA_BASE, HIRA_ALL, KATA_BASE, KATA_ALL,
-    recordDraw, recordVoice, markKnown,
+    recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, trackStats, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll

@@ -63,6 +63,14 @@
           </div>
           <label class="switch"><input type="checkbox" id="set-sfx" ${st.sfx !== false ? "checked" : ""}><span></span></label>
         </div>
+        <div class="set-row">
+          <div class="set-lbl">${t("set_sfx_volume")}
+            <div class="set-sub"><span id="sfx-vol-val">${st.sfxVolume === undefined ? 50 : st.sfxVolume}</span>%</div>
+          </div>
+          <input type="range" id="set-sfx-vol" min="0" max="100" step="5"
+                 value="${st.sfxVolume === undefined ? 50 : st.sfxVolume}"
+                 ${st.sfx === false ? "disabled" : ""}>
+        </div>
       </div>
 
       <h2>${t("settings_voice")}</h2>
@@ -100,7 +108,20 @@
     document.getElementById("set-strict").onchange = e => { st.strict = e.target.value; Engine.save(); };
     document.getElementById("set-slow").onchange = e => { st.ttsSlow = e.target.checked; Engine.save(); };
     document.getElementById("set-voice").onchange = e => { st.voiceOn = e.target.checked; Engine.save(); };
-    document.getElementById("set-sfx").onchange = e => { st.sfx = e.target.checked; Engine.save(); if (e.target.checked) sfx("good"); };
+    document.getElementById("set-sfx").onchange = e => {
+      st.sfx = e.target.checked; Engine.save();
+      document.getElementById("set-sfx-vol").disabled = !e.target.checked;
+      if (e.target.checked) sfx("good");
+    };
+    const vol = document.getElementById("set-sfx-vol");
+    let volTimer = null;
+    vol.oninput = e => {
+      st.sfxVolume = +e.target.value;
+      document.getElementById("sfx-vol-val").textContent = st.sfxVolume;
+      Engine.save();
+      clearTimeout(volTimer);
+      volTimer = setTimeout(() => sfx("sample"), 180);   // preview once the slider settles
+    };
     document.getElementById("tts-test").onclick = () => Voice.speak("こんにちは。日本語を勉強しましょう。");
 
     const dl = document.getElementById("whisper-dl");

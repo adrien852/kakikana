@@ -38,6 +38,16 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.4.0
+
+- **Kanji are now taught in order of real-world frequency** instead of stroke difficulty, so the everyday verbs come early: 出, 行, 見, 会, 入, 来, 言, 話, 立, 聞, 食 are all in the first two thirds now instead of dead last. The order blends four Japanese corpora (social media, news, Wikipedia, literature). Numbers are taught as one block near the front, because corpora undercount them — modern text writes "3", not 三.
+- **"Je veux apprendre ce kanji"** replaces "I already know this kanji". Tap it on any kanji and it jumps the queue, arriving right after the kanji you have already mastered — useful for anything the frequency order puts late (飲, 友, 右, 左…). Requested kanji are marked ★ in the library.
+- **Writing and pronunciation are now one exercise for kanji.** Every kanji encounter asks you to draw it, then say it. As before, after three attempts the app plays the model and moves on, so shaky recognition never blocks you. (If no speech recognition is available — offline without the voice pack — the drawing alone still counts.)
+- **Fixed:** after the third failed pronunciation attempt, the microphone stayed tappable and could open during the hand-over, accidentally validating the next exercise. The controls now lock as soon as an answer is graded.
+- **Volume slider** for the sound effects, next to the on/off switch.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.3.0
 
 - **Practise pronunciation anywhere in the library.** Open any kana or kanji and tap 🎤 next to a character or example word to say it out loud — the app tells you straight away whether it came out right, and what it heard if not.

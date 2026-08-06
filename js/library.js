@@ -197,9 +197,10 @@
       html += `<div class="kanji-grid">` + g.list.map(k => {
         const st = Engine.status(k.k);
         const active = Engine.state.kanjiActive.includes(k.k);
+        const wanted = Engine.isWanted(k.k);
         return `<div class="cell ${st}" data-k="${k.k}">
           <span class="dot"></span>
-          ${active ? `<span style="position:absolute;top:4px;left:6px;font-size:10px">✏️</span>` : ""}
+          ${active ? `<span class="cell-tag">✏️</span>` : wanted ? `<span class="cell-tag">★</span>` : ""}
           <span class="g jp" style="font-size:30px">${k.k}</span>
           <span class="r">${Engine.state.lang === "fr" ? k.fr.split(";")[0] : k.en.split(";")[0]}</span>
         </div>`;
@@ -216,6 +217,7 @@
     const st = Engine.status(ch);
     const p = Engine.state.chars[ch];
     const active = Engine.state.kanjiActive.includes(ch);
+    const wanted = Engine.isWanted(ch);
 
     const onH = k.on.length ? `<div class="kv"><div class="k">${t("onyomi")}</div><div class="v jp">${k.on.map(r => `${r[0]} <span class="muted">(${r[1]})</span>`).join("、 ")}</div></div>` : "";
     const kunH = k.kun.length ? `<div class="kv"><div class="k">${t("kunyomi")}</div><div class="v jp">${k.kun.map(r => `${r[0]} <span class="muted">(${r[1]})</span>`).join("、 ")}</div></div>` : "";
@@ -248,7 +250,8 @@
           <div class="detail-romaji">${lang === "fr" ? k.fr : k.en}</div>
           <div class="detail-fr">${t("theme_" + k.t)} · ${window.STROKES[ch].strokes.length} ${t("strokes_n")}</div>
           <div class="mt8"><span class="pill ${st}">${t("status_" + st)}</span>
-          ${active ? `<span class="pill learning">✏️ ${t("in_practice")}</span>` : ""}</div>
+          ${active ? `<span class="pill learning">✏️ ${t("in_practice")}</span>`
+            : wanted ? `<span class="pill known">★ ${t("queued")}</span>` : ""}</div>
         </div>
       </div>
       <div class="muted" style="font-size:12.5px;margin-top:6px">${Voice.anyEngineMaybe() ? t("practice_hint") : ""}</div>
@@ -258,14 +261,20 @@
       <div class="kv"><div class="k">${t("examples")}</div>${words}</div>
       <div class="kv"><div class="k">${t("sentence")}</div>${sentence}</div>
       <div class="kv"><div class="k">${t("learned_on")}</div><div class="v">${learnedOn}</div></div>
-      ${st !== "mastered" ? `<button class="btn secondary mt8" id="d-known">${t("mark_known")}</button>` :
-        (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "")}
+      ${st === "mastered" ? (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "") : active
+        ? `<div class="hint-banner">${t("already_learning")}</div>${wanted ? `<button class="btn ghost" id="d-want-un">${t("unwant_learn")}</button>` : ""}`
+        : wanted
+          ? `<div class="hint-banner">${t("queued_next")}</div><button class="btn ghost" id="d-want-un">${t("unwant_learn")}</button>`
+          : `<button class="btn secondary mt8" id="d-want">★ ${t("want_learn")}</button>
+             <div class="muted center" style="font-size:12.5px;margin-top:6px">${t("want_learn_sub")}</div>`}
     `);
     wirePractice(document.getElementById("modal-root"));
-    const kn = document.getElementById("d-known");
-    if (kn) kn.onclick = () => { Engine.markKnown(ch, true); App.closeModal(); render(); };
-    const knu = document.getElementById("d-known-un");
-    if (knu) knu.onclick = () => { Engine.markKnown(ch, false); App.closeModal(); render(); };
+    const wb = document.getElementById("d-want");
+    if (wb) wb.onclick = () => { sfx("right"); Engine.wantKanji(ch, true); App.closeModal(); render(); };
+    const wu = document.getElementById("d-want-un");
+    if (wu) wu.onclick = () => { sfx("tap"); Engine.wantKanji(ch, false); App.closeModal(); render(); };
+    const ku = document.getElementById("d-known-un");
+    if (ku) ku.onclick = () => { Engine.markKnown(ch, false); App.closeModal(); render(); };
     Drawing.animateIn(document.getElementById("detail-anim"), ch, 110);
   }
 

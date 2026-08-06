@@ -120,7 +120,13 @@
         flash(ok ? t("correct") : t("almost"), ok ? "good" : "bad");
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
-        setTimeout(() => { if (advancing && live) { idx++; next(); } }, 1300);
+        // kanji: writing and pronunciation are two halves of the same encounter
+        const speakPhase = type === "kanji" && Engine.state.settings.voiceOn && Voice.engineNow();
+        setTimeout(() => {
+          if (!advancing || !live) return;
+          if (speakPhase) renderVoice({ ch, type: "voice" }, true);
+          else { idx++; next(); }
+        }, 1300);
       }
     });
     document.getElementById("sess-hint").onclick = () => { if (current) current.giveHint(); };
@@ -135,8 +141,8 @@
     f.textContent = msg; f.className = "feedback " + cls;
   }
 
-  // ---------- voice item ----------
-  function renderVoice(it) {
+  // ---------- voice item (also phase 2 of every kanji encounter) ----------
+  function renderVoice(it, isSecondPhase) {
     const ch = it.ch;
     const type = Engine.charType(ch);
     const kana = Engine.KANA_MAP[ch];
@@ -157,9 +163,14 @@
     }
 
     let attempts = 0;
+    let resolved = false;         // graded — the mic must not open again
     const v = document.getElementById("view");
     v.innerHTML = header(`
       <div class="voice-panel">
+        ${isSecondPhase ? `<div class="phase-row">
+            <span class="phase done">1. ${t("phase_write")} ✓</span>
+            <span class="phase active">2. ${t("phase_say")}</span>
+          </div>` : ""}
         <div class="p-main mt16">${t("say_prompt")}</div>
         <div class="voice-char jp">${display}</div>
         <button class="btn secondary small" id="v-listen">🔊 ${t("listen")}</button>
@@ -172,7 +183,12 @@
         </div>
       </div>`);
     document.getElementById("sess-quit").onclick = quit;
-    document.getElementById("sess-skip").onclick = () => { Voice.cancel(); idx++; next(); };
+    document.getElementById("sess-skip").onclick = e => {
+      if (resolved) return;
+      resolved = true; Voice.cancel();
+      e.target.disabled = true;
+      idx++; next();
+    };
 
     const mic = document.getElementById("v-mic");
     const status = document.getElementById("v-status");
@@ -186,6 +202,16 @@
       listenBtn.classList.toggle("is-disabled", on);
       status.textContent = on ? t("mic_listening") : t("mic_start");
     }
+    // once the answer is graded, freeze the controls: an open mic during the
+    // hand-over would otherwise pick up speech and validate the next exercise.
+    function lockPanel() {
+      resolved = true;
+      Voice.cancel();
+      mic.disabled = true; mic.classList.add("is-disabled"); mic.classList.remove("rec");
+      const sk = document.getElementById("sess-skip");
+      if (sk) { sk.disabled = true; sk.classList.add("is-disabled"); }
+      status.textContent = "";
+    }
     listenBtn.onclick = () => { if (!Voice.isListening()) Voice.speak(target); };
 
     if (!Voice.engineNow()) {
@@ -195,6 +221,7 @@
     }
 
     mic.onclick = async () => {
+      if (resolved) return;
       // second tap = pause the attempt (time to think); nothing is graded
       if (Voice.isListening()) {
         Voice.cancel();
@@ -218,18 +245,20 @@
         const ok = alts.some(a => Voice.matches(a, accepts));
         attempts++;
         if (ok) {
+          lockPanel();
           sfx("right");
           flash(t("voice_correct"), "good");
           Engine.recordVoice(ch, true);
           score.total++; score.ok++;
           setTimeout(() => { if (live) { idx++; next(); } }, 1200);
         } else if (attempts >= 3) {
+          lockPanel();
           sfx("bad");
           flash(t("voice_close"), "bad");
           Engine.recordVoice(ch, false);
           score.total++;
           Voice.speak(target);
-          setTimeout(() => { if (live) { idx++; next(); } }, 1800);
+          setTimeout(() => { if (live) { idx++; next(); } }, 2200);
         } else {
           sfx("miss");
           flash(t("voice_retry"), "bad");
