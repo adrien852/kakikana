@@ -39,37 +39,113 @@
     for (let i = 0x30a1; i <= 0x30f6; i++) map[String.fromCharCode(i)] = String.fromCharCode(i - 0x60);
     return map;
   })();
+
+  // --- numbers ---------------------------------------------------------------
+  // Speech recognition writes numbers as digits ("2つ") while the app stores them
+  // as kanji ("二つ"). Both sides are reduced to the same digit form before matching.
+  const NUM_DIGIT = { "〇": 0, "零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+  const NUM_MULT = { "十": 10, "百": 100, "千": 1000 };
+  const NUM_RUN = /[0-9〇零一二三四五六七八九十百千万]+/g;
+
+  function parseJaNumber(str) {
+    let total = 0, section = 0, current = 0, seen = false, i = 0;
+    while (i < str.length) {
+      const c = str[i];
+      if (c >= "0" && c <= "9") {
+        let j = i;
+        while (j < str.length && str[j] >= "0" && str[j] <= "9") j++;
+        current = parseInt(str.slice(i, j), 10); seen = true; i = j; continue;
+      }
+      if (c in NUM_DIGIT) { current = NUM_DIGIT[c]; seen = true; i++; continue; }
+      if (c in NUM_MULT) { section += (current || 1) * NUM_MULT[c]; current = 0; seen = true; i++; continue; }
+      if (c === "万") { total += ((section + current) || 1) * 10000; section = 0; current = 0; seen = true; i++; continue; }
+      i++;
+    }
+    return seen ? total + section + current : null;
+  }
+
+  // spoken number + counter → digits, so 「ふたつ」「二つ」「2つ」 are one and the same,
+  // and neighbouring numbers (四月 / 七月) stay clearly different.
+  const NUM_WORDS = [
+    ["ひとつ", "1つ"], ["ふたつ", "2つ"], ["みっつ", "3つ"], ["よっつ", "4つ"], ["いつつ", "5つ"],
+    ["むっつ", "6つ"], ["ななつ", "7つ"], ["やっつ", "8つ"], ["ここのつ", "9つ"],
+    ["いちがつ", "1がつ"], ["にがつ", "2がつ"], ["さんがつ", "3がつ"], ["しがつ", "4がつ"], ["ごがつ", "5がつ"],
+    ["ろくがつ", "6がつ"], ["しちがつ", "7がつ"], ["はちがつ", "8がつ"], ["くがつ", "9がつ"],
+    ["じゅうがつ", "10がつ"], ["じゅういちがつ", "11がつ"], ["じゅうにがつ", "12がつ"],
+    ["いちじかん", "1じかん"], ["にじかん", "2じかん"],
+    ["いちじ", "1じ"], ["にじ", "2じ"], ["さんじ", "3じ"], ["よじ", "4じ"], ["ごじ", "5じ"],
+    ["ろくじ", "6じ"], ["しちじ", "7じ"], ["はちじ", "8じ"], ["くじ", "9じ"], ["じゅうじ", "10じ"],
+    ["いっぷん", "1ふん"], ["にふん", "2ふん"], ["さんぷん", "3ふん"], ["よんぷん", "4ふん"], ["ごふん", "5ふん"],
+    ["ろっぷん", "6ふん"], ["ななふん", "7ふん"], ["はっぷん", "8ふん"], ["きゅうふん", "9ふん"],
+    ["じゅっぷん", "10ふん"], ["じっぷん", "10ふん"],
+    ["ひとり", "1にん"], ["ふたり", "2にん"], ["さんにん", "3にん"], ["よにん", "4にん"], ["ごにん", "5にん"],
+    ["ひゃくえん", "100えん"], ["にひゃくえん", "200えん"], ["ごひゃくえん", "500えん"],
+    ["せんえん", "1000えん"], ["いちまんえん", "10000えん"],
+    ["いっしゅうかん", "1しゅうかん"], ["にしゅうかん", "2しゅうかん"]
+  ].sort((a, b) => b[0].length - a[0].length);
+  // whole-word only (these fragments appear inside ordinary words like せんせい)
+  const NUM_EXACT = {
+    "とお": "10", "じゅう": "10", "ひゃく": "100", "さんびゃく": "300",
+    "せん": "1000", "さんぜん": "3000", "いちまん": "10000", "ぜろ": "0", "れい": "0"
+  };
+
   function normJa(s) {
     if (!s) return "";
+    // full-width digits → ASCII
+    s = s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
     s = s.replace(/[\s。、．，,.!?！？「」・'’\-~〜ー]/g, m => m === "ー" ? "ー" : "");
-    let out = "";
-    for (const c of s) out += K2H[c] || c;
-    return out.toLowerCase();
-  }
-  function lev(a, b) {
-    const m = a.length, n = b.length;
-    if (!m) return n; if (!n) return m;
-    let prev = Array.from({ length: n + 1 }, (_, j) => j);
-    for (let i = 1; i <= m; i++) {
-      const cur = [i];
-      for (let j = 1; j <= n; j++) {
-        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-      }
-      prev = cur;
+    // katakana → hiragana first, so spoken numbers are found whatever the script
+    let k = "";
+    for (const c of s) k += K2H[c] || c;
+    s = k;
+    // unify every way of saying / writing a number
+    if (NUM_EXACT[s]) s = NUM_EXACT[s];
+    for (const [word, digits] of NUM_WORDS) {
+      if (s.indexOf(word) >= 0) s = s.split(word).join(digits);
     }
-    return prev[n];
+    s = s.replace(NUM_RUN, m => { const v = parseJaNumber(m); return v === null ? m : String(v); });
+    return s.toLowerCase();
   }
+
+  // every accepted written form of an expected string (standard orthography, etc.)
+  function variants(s) {
+    if (!s) return [];
+    const out = [s];
+    const alt = window.SPELLINGS && window.SPELLINGS[s];
+    if (alt) for (const a of alt) if (out.indexOf(a) < 0) out.push(a);
+    return out;
+  }
+  // characters recognizers add or drop without changing the pronunciation heard
+  const loose = s => s.replace(/[っゃゅょぁぃぅぇぉー]/g, "");
+  const isKana = c => { const n = c.codePointAt(0); return n >= 0x3040 && n <= 0x30ff; };
+
   // expected: array of acceptable strings (kana, kanji spelling, romaji)
   function matches(heardRaw, expected) {
     const heard = normJa(heardRaw);
     if (!heard) return false;
-    for (const eRaw of expected) {
+    const expanded = [];
+    for (const e of expected) for (const v of variants(e)) expanded.push(v);
+    const digitsOf = s => (s.match(/\d+/g) || []).join(",");
+    // recognizers often append politeness the learner didn't say
+    const bare = heard.replace(/(です(ね|よ)?|でした|だ(ね|よ)?)$/, "");
+    const heardNums = digitsOf(heard);
+    for (const eRaw of expanded) {
       const e = normJa(eRaw);
       if (!e) continue;
-      if (heard === e) return true;
-      if (e.length >= 2 && (heard.includes(e) || e.includes(heard))) return true;
-      if (e.length >= 3 && lev(heard, e) <= 1) return true;
-      if (e.length === 1 && heard[0] === e) return true;
+      if (heard === e || bare === e) return true;
+      // a different number is a different word — never fuzzy-match across numbers
+      if (digitsOf(e) !== heardNums) continue;
+      // one trailing particle the learner may have added ("ふたつの", "ほんを")
+      const extra = bare.length - e.length;
+      if (e.length >= 3 && extra === 1 && bare.lastIndexOf(e, 0) === 0 &&
+          "のねよわさかなもがをにでっー".indexOf(bare[bare.length - 1]) >= 0) return true;
+      // forgive long-vowel / small-kana notation slips in longer words ("コーヒ" for
+      // コーヒー), never in short ones where they carry the meaning (ちず ≠ チーズ).
+      if (e.length >= 4 && loose(bare) === loose(e)) return true;
+      // one-mora kana targets: accept the syllable held or doubled ("あー", "ああ"),
+      // since recognizers seldom return a bare mora — but not another word.
+      if (e.length === 1 && isKana(e) && bare.length === 2 && bare[0] === e &&
+          "あいうえおー".indexOf(bare[1]) >= 0) return true;
     }
     return false;
   }
@@ -191,5 +267,5 @@
     return await recognizeWhisper(statusCb);
   }
 
-  window.Voice = { speak, hasTTS, matches, normJa, anyEngineMaybe, engineNow, listen, loadWhisper, whisperEnabled };
+  window.Voice = { speak, hasTTS, matches, normJa, variants, anyEngineMaybe, engineNow, listen, loadWhisper, whisperEnabled };
 })();

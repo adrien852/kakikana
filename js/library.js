@@ -15,7 +15,7 @@
         <button class="lib-tab ${tab === "kanji" ? "active" : ""}" data-t="kanji">${t("kanji")}</button>
       </div>
       <div id="lib-body"></div>`;
-    v.querySelectorAll(".lib-tab").forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+    v.querySelectorAll(".lib-tab").forEach(b => b.onclick = () => { sfx("tap"); tab = b.dataset.t; render(); });
     if (tab === "kanji") renderKanji(); else renderKana(tab);
   }
 
@@ -38,7 +38,7 @@
     src.small.forEach(k => html += cellKana(k));
     html += `</div>`;
     body.innerHTML = html;
-    body.querySelectorAll(".cell").forEach(c => c.onclick = () => openKana(c.dataset.k, sy));
+    body.querySelectorAll(".cell").forEach(c => c.onclick = () => { sfx("pop"); openKana(c.dataset.k, sy); });
   }
 
   function cellKana(k) {
@@ -123,8 +123,8 @@
       }).join("") + `</div>`;
     });
     body.innerHTML = html;
-    body.querySelectorAll(".sort-chip").forEach(b => b.onclick = () => { kanjiSort = b.dataset.s; renderKanji(); });
-    body.querySelectorAll(".cell").forEach(c => c.onclick = () => openKanji(c.dataset.k));
+    body.querySelectorAll(".sort-chip").forEach(b => b.onclick = () => { sfx("tap"); kanjiSort = b.dataset.s; renderKanji(); });
+    body.querySelectorAll(".cell").forEach(c => c.onclick = () => { sfx("pop"); openKanji(c.dataset.k); });
   }
 
   function openKanji(ch) {

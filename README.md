@@ -38,6 +38,14 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.2.0
+
+- **Pronunciation is no longer marked wrong when it was right.** Speech recognition writes numbers as digits ("2つ") and words in kanji ("朝" for あさ), which the app then failed to recognise. Every way of saying or writing a number is now treated as one and the same, and standard spellings are accepted throughout the vocabulary — while a *different* number or a neighbouring word (四月 vs 七月, お父さん vs お母さん) is still correctly rejected.
+- **Subtle sound effects** throughout: a brush touch per stroke, a soft chime when a character is validated, a distinct flourish when a character becomes mastered, and a short melody at the end of a session or exam. All synthesized in the app, so nothing extra to download and it still works offline. Turn them off any time in Réglages → Sons de l'application.
+- **Fixed:** finishing a character and immediately switching page could make the exercise pop back over the screen you had just opened.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.1.0
 
 - **Stroke detection rewritten for loop characters** (ね, ぬ, む, め, あ, る, す, よ, ま, み, お, を…): the reference stroke paths contained hidden discontinuities that made correct loops nearly impossible to validate. They have been rebuilt and verified for all 151 kana.

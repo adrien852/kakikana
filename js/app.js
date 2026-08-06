@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.1.0";
+  window.APP_VERSION = "1.2.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -72,6 +72,9 @@
   // ---------- navigation ----------
   const tabs = { home: renderHome, library: () => Library.render(), exam: () => Exam.render(), settings: () => Settings.render() };
   function go(name) {
+    // stop anything that might render itself over the new screen
+    if (window.Session && Session.stop) Session.stop();
+    if (window.Exam && Exam.stop) Exam.stop();
     closeModal();
     setTab(name);
     (tabs[name] || renderHome)();
@@ -80,7 +83,7 @@
     document.querySelectorAll("#tabbar .tab").forEach(b =>
       b.classList.toggle("active", b.dataset.tab === name));
   }
-  document.querySelectorAll("#tabbar .tab").forEach(b => b.onclick = () => go(b.dataset.tab));
+  document.querySelectorAll("#tabbar .tab").forEach(b => b.onclick = () => { sfx("nav"); go(b.dataset.tab); });
 
   // ---------- onboarding ----------
   function onboard() {

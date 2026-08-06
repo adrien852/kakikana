@@ -3,11 +3,14 @@
   let items = [], idx = 0, score = { ok: 0, total: 0 };
   let current = null; // mounted drawing
   let advancing = false;
+  let live = false;       // a session is on screen (guards queued timers)
   let curTrack = null; // null = mixed, or "hiragana"|"katakana"|"kanji"
 
   function t(key) { return window.App.t(key); }
 
   function start(track) {
+    sfx("start");
+    live = true;
     curTrack = track || null;
     items = Engine.buildSession(curTrack);
     idx = 0; score = { ok: 0, total: 0 };
@@ -17,6 +20,7 @@
 
   function next() {
     advancing = false;
+    if (!live) return;
     if (current) { current.destroy(); current = null; }
     if (idx >= items.length) return finish();
     const it = items[idx];
@@ -84,6 +88,7 @@
     document.getElementById("sess-quit").onclick = quit;
     document.getElementById("sess-speak").onclick = () => Voice.speak(speakText);
     document.getElementById("sess-skip").onclick = () => {
+      sfx("tap");
       Engine.recordDraw(ch, false, false);
       score.total++;
       idx++; next();
@@ -93,11 +98,13 @@
     const box = document.getElementById("draw-container");
     current = Drawing.mount(box, ch, stage, {
       onStroke: (n, total) => {
+        sfx("stroke");
         const el = document.getElementById("stroke-count");
         if (el) el.textContent = `${t("stroke_of")} ${n} ${t("of")} ${total}`;
       },
       onMistake: m => {
         mistakes = m;
+        sfx("miss");
         flash(t("incorrect"), "bad");
       },
       onHint: () => {},
@@ -105,18 +112,21 @@
         const strokes = window.STROKES[ch] ? window.STROKES[ch].strokes.length : 1;
         const ok = res.totalMistakes <= Math.max(2, strokes);            // overall success
         const unaided = stage >= 3 && !res.hintUsed && res.totalMistakes <= 2;
+        const wasMastered = Engine.P(ch).mastered;
         Engine.recordDraw(ch, ok, unaided);
+        const justMastered = !wasMastered && Engine.P(ch).mastered;
         score.total++; if (ok) score.ok++;
+        sfx(justMastered ? "master" : ok ? "good" : "soso");
         flash(ok ? t("correct") : t("almost"), ok ? "good" : "bad");
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
-        setTimeout(() => { if (advancing) { idx++; next(); } }, 1300);
+        setTimeout(() => { if (advancing && live) { idx++; next(); } }, 1300);
       }
     });
     document.getElementById("sess-hint").onclick = () => { if (current) current.giveHint(); };
 
     // auto TTS on new characters
-    if (it.tag === "new" || stage <= 0) setTimeout(() => Voice.speak(speakText), 400);
+    if (it.tag === "new" || stage <= 0) setTimeout(() => { if (live) Voice.speak(speakText); }, 400);
   }
 
   function flash(msg, cls) {
@@ -190,17 +200,20 @@
         const ok = alts.some(a => Voice.matches(a, accepts));
         attempts++;
         if (ok) {
+          sfx("right");
           flash(t("voice_correct"), "good");
           Engine.recordVoice(ch, true);
           score.total++; score.ok++;
-          setTimeout(() => { idx++; next(); }, 1200);
+          setTimeout(() => { if (live) { idx++; next(); } }, 1200);
         } else if (attempts >= 3) {
+          sfx("bad");
           flash(t("voice_close"), "bad");
           Engine.recordVoice(ch, false);
           score.total++;
           Voice.speak(target);
-          setTimeout(() => { idx++; next(); }, 1800);
+          setTimeout(() => { if (live) { idx++; next(); } }, 1800);
         } else {
+          sfx("miss");
           flash(t("voice_retry"), "bad");
           Voice.speak(target);
         }
@@ -212,6 +225,8 @@
   }
 
   function finish() {
+    live = false;
+    sfx("fanfare");
     const v = document.getElementById("view");
     const pct = score.total ? Math.round(100 * score.ok / score.total) : 100;
     v.innerHTML = `<div class="done-panel">
@@ -225,10 +240,14 @@
     document.getElementById("sess-home").onclick = () => App.go("home");
   }
 
-  function quit() {
+  // leaving the session: kill pending timers so nothing renders over the next screen
+  function stop() {
+    live = false; advancing = false;
     if (current) { current.destroy(); current = null; }
-    App.go("home");
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
   }
 
-  window.Session = { start };
+  function quit() { stop(); App.go("home"); }
+
+  window.Session = { start, stop };
 })();

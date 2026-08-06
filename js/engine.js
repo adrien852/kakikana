@@ -8,7 +8,7 @@
     ver: 1,
     lang: "fr",
     onboarded: false,
-    settings: { activeKanji: 3, masteryReps: 5, minDays: 3, strict: "normal", voiceOn: true, ttsSlow: false, whisper: false },
+    settings: { activeKanji: 3, masteryReps: 5, minDays: 3, strict: "normal", voiceOn: true, ttsSlow: false, whisper: false, sfx: true },
     chars: {},        // per-char progress
     kanjiActive: [],  // kanji currently in practice
     kanjiOrder: [],   // chars in the order they entered practice/known

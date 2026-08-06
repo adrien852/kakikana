@@ -3,6 +3,7 @@
   const MIN_MASTERED = 5;
   let qs = [], qi = 0, right = 0, detail = [];
   let current = null;
+  let live = false;       // an exam is on screen (guards queued timers)
 
   function t(k) { return App.t(k); }
 
@@ -32,6 +33,8 @@
   }
 
   function startExam() {
+    sfx("start");
+    live = true;
     const mastered = shuffle(Engine.masteredKanji());
     qs = []; qi = 0; right = 0; detail = [];
     const nDraw = Math.min(6, mastered.length);
@@ -53,6 +56,7 @@
   }
 
   function nextQ() {
+    if (!live) return;
     if (current) { current.destroy(); current = null; }
     if (qi >= qs.length) return finish();
     const q = qs[qi];
@@ -146,6 +150,7 @@
   }
 
   function answer(ok, q) {
+    sfx(ok ? "right" : "bad");
     if (current) { current.destroy(); current = null; }
     if (ok) right++;
     detail.push({ ch: q.ch, kind: q.kind, ok });
@@ -154,6 +159,8 @@
   }
 
   function finish() {
+    live = false;
+    sfx("fanfare");
     Engine.state.exams.push({ date: Date.now(), score: right, total: qs.length });
     Engine.save();
     const pct = Math.round(100 * right / qs.length);
@@ -172,11 +179,16 @@
     document.getElementById("ex-back").onclick = () => App.go("exam");
   }
 
+  function stop() {
+    live = false;
+    if (current) { current.destroy(); current = null; }
+  }
+
   function shuffle(a) {
     a = a.slice();
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
 
-  window.Exam = { render };
+  window.Exam = { render, stop };
 })();
