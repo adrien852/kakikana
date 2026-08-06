@@ -1,5 +1,5 @@
 // KakiKana service worker — offline-first
-const VERSION = "kakikana-v1.4.0";
+const VERSION = "kakikana-v1.5.0";
 const PRECACHE = [
   "./",
   "index.html",
@@ -11,6 +11,7 @@ const PRECACHE = [
   "data/kanji_a.js",
   "data/kanji_b.js",
   "data/kanji_c.js",
+  "data/dictation.js",
   "data/spellings.js",
   "data/i18n.js",
   "js/engine.js",

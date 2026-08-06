@@ -71,6 +71,7 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .pill.learning { background: #fdebc8; color: #8a6d1a; }
 .pill.known { background: #d9ecff; color: var(--blue); }
 .pill.mastered { background: #d9f0e3; color: var(--green); }
+.pill.dictation { background: #e4e0f5; color: #5b4b9e; }
 /* ---- session ---- */
 .session-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .session-top .pbar { flex: 1; margin-top: 0; }

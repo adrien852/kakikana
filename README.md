@@ -38,6 +38,15 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.5.0
+
+- **Dictation exercise.** From time to time a character arrives as sound only: you hear it, nothing is shown, and you write it. It replaces the usual prompt for that encounter rather than adding a step, and only appears once a character is solid (SRS stage 3+), alternating with the visual prompt so both directions keep being practised. Works for hiragana, katakana (the prompt says which script) and kanji.
+- **Only safe dictations.** A kanji is dictated only when the audio is a complete standalone word written with exactly that one kanji — 52 of the 104 qualify. Excluded on purpose: one-mora readings that collide (ひ is both 日 and 火, き is both 木 and 気), anything needing okurigana or a compound, and きた (北), which sounds exactly like 来た. For kana, the identical-sounding pairs じ/ぢ and ず/づ, the particle を, small kana and ー are left out.
+- **Kana practice now circles back.** Instead of marching through a syllabary once, sessions hold back new characters while too many are still shaky and regularly bring back ones you already know, least recently practised first.
+- **Slightly longer daily sessions** (about 11–18 exercises) so the dictations fit without displacing your reviews.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.4.0
 
 - **Kanji are now taught in order of real-world frequency** instead of stroke difficulty, so the everyday verbs come early: 出, 行, 見, 会, 入, 来, 言, 話, 立, 聞, 食 are all in the first two thirds now instead of dead last. The order blends four Japanese corpora (social media, news, Wikipedia, literature). Numbers are taught as one block near the front, because corpora undercount them — modern text writes "3", not 三.

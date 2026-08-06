@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.4.0";
+  window.APP_VERSION = "1.5.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";

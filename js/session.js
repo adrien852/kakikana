@@ -53,8 +53,17 @@
     const kana = Engine.KANA_MAP[ch];
     const kanji = Engine.KANJI_MAP[ch];
 
+    // audio-first encounter: nothing on screen but the sound
+    const dict = it.mode === "dictation" ? Engine.dictationInfo(ch) : null;
+    const dictation = dict && Voice.hasTTS() ? dict : null;
+
     let promptMain, promptSub = "", speakText = null;
-    if (type === "kanji") {
+    if (dictation) {
+      promptMain = t("dictation_prompt");
+      promptSub = type === "kanji" ? t("dictation_sub_kanji")
+        : `${t(type)} — ${t("dictation_sub_kana")}`;
+      speakText = dictation.r;
+    } else if (type === "kanji") {
       const lang = Engine.state.lang;
       promptMain = `${t("draw_meaning_hint")} <b>« ${lang === "fr" ? kanji.fr : kanji.en} »</b>`;
       const rd = (kanji.kun[0] || kanji.on[0]);
@@ -64,20 +73,22 @@
       const r = kana ? kana.r : "";
       promptMain = `<span class="p-big">${r}</span>`;
       speakText = ch;
+      // (visual prompt: the romaji above)
       promptSub = stage <= 0 ? t("draw_prompt_trace") : (stage <= 2 ? t("draw_prompt_guided") : t("draw_prompt_free"));
     }
 
     const v = document.getElementById("view");
     v.innerHTML = header(`
-      <div class="prompt">
-        <div>${tagLabel(it.tag)}</div>
+      <div class="prompt" id="prompt-box">
+        <div>${tagLabel(it.tag)}${dictation ? ` <span class="pill dictation">🎧 ${t("dictation_pill")}</span>` : ""}</div>
         <div class="p-main mt8">${promptMain}</div>
         <div class="p-sub">${promptSub}</div>
       </div>
       <div class="char-stage">
-        <button class="btn secondary small" id="sess-speak" style="margin-bottom:10px">🔊 ${t("listen")}</button>
+        <button class="btn ${dictation ? "" : "secondary"} small" id="sess-speak" style="margin-bottom:10px">
+          🔊 ${dictation ? t("replay") : t("listen")}</button>
         <div id="draw-container"></div>
-        <div class="stroke-count" id="stroke-count">${window.STROKES[ch] ? window.STROKES[ch].strokes.length : "?"} ${t("strokes_n")}</div>
+        <div class="stroke-count" id="stroke-count">${dictation ? "" : (window.STROKES[ch] ? window.STROKES[ch].strokes.length : "?") + " " + t("strokes_n")}</div>
         <div class="feedback" id="feedback"></div>
         <div class="session-actions">
           <button class="btn secondary small" id="sess-hint">${t("show_hint")}</button>
@@ -91,7 +102,8 @@
       sfx("tap");
       Engine.recordDraw(ch, false, false);
       score.total++;
-      idx++; next();
+      if (dictation) { reveal(); Voice.speak(speakText); setTimeout(() => { if (live) { idx++; next(); } }, 1600); }
+      else { idx++; next(); }
     };
 
     let mistakes = 0;
@@ -117,11 +129,14 @@
         const justMastered = !wasMastered && Engine.P(ch).mastered;
         score.total++; if (ok) score.ok++;
         sfx(justMastered ? "master" : ok ? "good" : "soso");
+        if (dictation) reveal();
         flash(ok ? t("correct") : t("almost"), ok ? "good" : "bad");
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
         // kanji: writing and pronunciation are two halves of the same encounter
-        const speakPhase = type === "kanji" && Engine.state.settings.voiceOn && Voice.engineNow();
+        let speakPhase = type === "kanji" && Engine.state.settings.voiceOn && Voice.engineNow();
+        // after a dictation, asking for the very word just played adds nothing
+        if (speakPhase && dictation && kanji.w[0] && kanji.w[0][1] === dictation.r) speakPhase = false;
         setTimeout(() => {
           if (!advancing || !live) return;
           if (speakPhase) renderVoice({ ch, type: "voice" }, true);
@@ -129,10 +144,28 @@
         }, 1300);
       }
     });
-    document.getElementById("sess-hint").onclick = () => { if (current) current.giveHint(); };
+    // what the dictation was, shown once the answer is in (or on demand)
+    function reveal() {
+      const box = document.getElementById("prompt-box");
+      if (!box) return;
+      // for kana the romaji is already shown, so only kanji add a meaning
+      const meaning = type === "kanji" ? (Engine.state.lang === "fr" ? kanji.fr : kanji.en) : "";
+      box.innerHTML = `<div class="p-big jp">${ch}</div>
+        <div class="p-sub"><b>${dictation.r}</b> · ${dictation.ro}${meaning ? " — " + meaning : ""}</div>`;
+    }
 
-    // auto TTS on new characters
-    if (it.tag === "new" || stage <= 0) setTimeout(() => { if (live) Voice.speak(speakText); }, 400);
+    document.getElementById("sess-hint").onclick = () => {
+      if (current) current.giveHint();
+      // in a dictation, the useful hint is what the word means
+      if (dictation && type === "kanji") {
+        const sub = document.querySelector("#prompt-box .p-sub");
+        if (sub) sub.innerHTML = `« ${Engine.state.lang === "fr" ? kanji.fr : kanji.en} »`;
+      }
+    };
+
+    // play the dictation on arrival; otherwise only on brand-new characters
+    if (dictation) setTimeout(() => { if (live) Voice.speak(speakText); }, 350);
+    else if (it.tag === "new" || stage <= 0) setTimeout(() => { if (live) Voice.speak(speakText); }, 400);
   }
 
   function flash(msg, cls) {

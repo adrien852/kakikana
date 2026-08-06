@@ -21,17 +21,21 @@
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       if (!jaVoice) pickVoice();
-      if (jaVoice) u.voice = jaVoice;
+      // a rejected voice object must never stop the utterance from being spoken
+      try { if (jaVoice) u.voice = jaVoice; } catch (e) { jaVoice = null; }
       const slow = (opts && opts.slow) || (window.Engine && Engine.state.settings.ttsSlow);
       u.rate = slow ? 0.65 : 0.9;
       u.onend = () => resolve(true);
       u.onerror = () => resolve(false);
-      speechSynthesis.speak(u);
+      try { speechSynthesis.speak(u); } catch (e) { return resolve(false); }
       // safety timeout
       setTimeout(() => resolve(true), 8000);
     });
   }
   function hasTTS() { return !!(window.speechSynthesis && (jaVoice || pickVoice())); }
+  // voices load asynchronously, so "there is a speech engine" is the useful test
+  // when planning a session ahead of time
+  function ttsMaybe() { return !!window.speechSynthesis; }
 
   // ---------- kana normalization / matching ----------
   const K2H = (() => {
@@ -302,6 +306,6 @@
   }
   function isListening() { return listening; }
 
-  window.Voice = { speak, hasTTS, matches, normJa, variants, anyEngineMaybe, engineNow,
+  window.Voice = { speak, hasTTS, ttsMaybe, matches, normJa, variants, anyEngineMaybe, engineNow,
                    listen, cancel, isListening, loadWhisper, whisperEnabled };
 })();

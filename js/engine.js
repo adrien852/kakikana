@@ -3,6 +3,9 @@
   const LS_KEY = "kakikana_state_v1";
   const DAY = 86400000;
   const BOX_DAYS = [0, 1, 2, 4, 8, 16, 32];
+  const MAX_ITEMS = 18;        // exercises per session
+  const MIN_ITEMS = 11;        // …and a session should not feel thin either
+  const MAX_IN_FLIGHT = 8;     // characters allowed to be "still shaky" at once
 
   const DEFAULTS = {
     ver: 1,
@@ -50,6 +53,32 @@
   const KANA_MAP = {};
   HIRA_ALL.concat(KATA_ALL).forEach(k => KANA_MAP[k.k] = k);
   window.KANA.hiragana.small.concat(window.KANA.katakana.small).forEach(k => KANA_MAP[k.k] = k);
+
+  // ---- dictation ----------------------------------------------------------
+  // Kana that cannot be dictated safely: identical-sounding pairs and characters
+  // with no sound of their own.
+  const NO_DICT_KANA = "をヲじヂぢジずヅづズゃゅょっャュョッー";
+  const DICT_MIN_STAGE = 3;          // audio-first only once the character is solid
+
+  // Returns { r: text to speak, ro: romaji, script } or null when unsafe.
+  function dictationInfo(ch) {
+    const d = window.DICTATION && window.DICTATION[ch];
+    if (d) return { r: d.r, ro: d.ro, script: "kanji" };
+    const k = KANA_MAP[ch];
+    if (!k || NO_DICT_KANA.indexOf(ch) >= 0) return null;
+    if (!window.STROKES[ch]) return null;
+    return { r: ch, ro: k.r, script: charType(ch) };
+  }
+
+  // An encounter arrives audio-first once the character is solid, alternating
+  // with the visual prompt so both directions keep being practised.
+  function dictationMode(ch) {
+    const p = S.chars[ch];
+    if (!p || p.stage < DICT_MIN_STAGE) return false;
+    if (!window.Voice || !window.Voice.ttsMaybe()) return false;
+    if (!dictationInfo(ch)) return false;
+    return p.enc % 2 === 1;
+  }
 
   function charType(ch) {
     if (KANJI_MAP[ch]) return "kanji";
@@ -211,6 +240,18 @@
       return p && p.enc > 0 && !p.mastered && !p.known && p.due <= now;
     });
   }
+  // characters that are getting solid (stage ≥ 2) but are not due yet —
+  // least recently seen first, so the whole learned set keeps rotating
+  function warmChars(pool, n) {
+    const now = Date.now();
+    const w = pool.filter(ch => {
+      const p = S.chars[ch];
+      return p && p.enc > 0 && !p.mastered && !p.known && p.stage >= 2 && p.due > now;
+    });
+    w.sort((a, b) => (S.chars[a].lastSeen || 0) - (S.chars[b].lastSeen || 0));
+    return w.slice(0, n);
+  }
+
   function dueMastered(pool, n) {
     const now = Date.now();
     const m = pool.filter(ch => { const p = S.chars[ch]; return p && (p.mastered || p.known) && p.due <= now; });
@@ -241,7 +282,7 @@
     // 1) due reviews from the chosen pool
     let due = dueChars(pool);
     due.sort((a, b) => (S.chars[a].due - S.chars[b].due));
-    due.slice(0, 7).forEach(ch => items.push({ type: "draw", ch, tag: "review" }));
+    due.slice(0, 9).forEach(ch => items.push({ type: "draw", ch, tag: "review" }));
 
     // 2) active kanji practice (kanji or mixed session)
     if (!track || track === "kanji") {
@@ -251,15 +292,20 @@
       });
     }
 
-    // 3) new character intros
+    // 3) new character intros — but only while few characters are still shaky,
+    // so a track is not "covered once" in a single sweep and then forgotten.
+    const inFlight = (track === "hiragana" ? hira : track === "katakana" ? kata : hira.concat(kata))
+      .filter(ch => { const p = S.chars[ch]; return p && p.enc > 0 && !p.mastered && !p.known && p.stage < 3; }).length;
+    const roomForNew = inFlight < MAX_IN_FLIGHT;
+
     if (track === "hiragana" || track === "katakana") {
       const room = Math.max(0, 10 - items.length);
-      nextNewKana(track, Math.min(3, Math.max(1, room)))
-        .forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
+      const n = roomForNew ? Math.min(3, Math.max(1, room)) : 0;
+      if (n) nextNewKana(track, n).forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
     } else if (!track) {
       // mixed: follow the suggested focus, interleaving syllabaries so neither stalls
       const focus = currentTrack();
-      if (focus !== "kanji") {
+      if (focus !== "kanji" && roomForNew) {
         const room = Math.max(0, 10 - items.length);
         const n = Math.min(3, Math.max(1, room));
         const other = focus === "hiragana" ? "katakana" : "hiragana";
@@ -279,6 +325,12 @@
       if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: "mastered" });
     });
 
+    // 4b) come back to characters already at a higher stage, even if not due yet:
+    // a track should keep circling back instead of being seen once and left.
+    warmChars(pool, 3).forEach(ch => {
+      if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: "review" });
+    });
+
     // 5) voice items on well-known chars
     if (S.settings.voiceOn && window.Voice && window.Voice.anyEngineMaybe()) {
       const cands = items
@@ -287,8 +339,8 @@
       shuffle(cands).slice(0, 2).forEach(ch => items.push({ type: "voice", ch }));
     }
 
-    // cap ~14, keep at least something
-    let list = items.slice(0, 14);
+    // cap the session length, keep at least something
+    let list = items.slice(0, MAX_ITEMS);
     if (!list.length) {
       // nothing due: consolidate random learned chars from the pool
       const learned = pool.filter(ch => S.chars[ch] && S.chars[ch].enc > 0);
@@ -297,6 +349,29 @@
         nextNewKana(track || "hiragana", 3).forEach(ch => list.push({ type: "draw", ch, tag: "new" }));
       }
     }
+    // 6) top the session up with characters already learned, least recently seen
+    // first — this is what keeps the whole set circulating instead of each
+    // character being met once and left behind.
+    if (list.length < MIN_ITEMS) {
+      const have = {}; list.forEach(i => have[i.ch] = true);
+      const extras = pool.filter(ch => {
+        const p = S.chars[ch];
+        return p && p.enc > 0 && !have[ch];
+      });
+      extras.sort((a, b) => {
+        const pa = S.chars[a], pb = S.chars[b];
+        // prefer the least recently practised, then the least solid
+        return (pa.lastSeen || 0) - (pb.lastSeen || 0) || pa.stage - pb.stage;
+      });
+      for (const ch of extras) {
+        if (list.length >= MIN_ITEMS) break;
+        list.push({ type: "draw", ch, tag: S.chars[ch].mastered || S.chars[ch].known ? "mastered" : "review" });
+        have[ch] = true;
+      }
+    }
+
+    // decide which encounters arrive as dictation (audio-first)
+    list.forEach(it => { if (it.type === "draw" && it.tag !== "new" && dictationMode(it.ch)) it.mode = "dictation"; });
     // interleave: new items spread out
     return interleave(list);
   }
@@ -369,6 +444,7 @@
     save, P, status, charType,
     KANJI, KANJI_MAP, KANA_MAP, HIRA_BASE, HIRA_ALL, KATA_BASE, KATA_ALL,
     recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
+    dictationInfo, dictationMode,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, trackStats, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll
