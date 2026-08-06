@@ -152,6 +152,10 @@
 
   // ---------- Web Speech recognition (online) ----------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let activeRec = null;        // recognition in progress
+  let activeRecorder = null;   // MediaRecorder in progress (offline pack)
+  let cancelled = false;
+  let listening = false;
   function webSpeechAvailable() { return !!SR && navigator.onLine; }
 
   function recognizeWebSpeech() {
@@ -160,17 +164,24 @@
       rec.lang = "ja-JP";
       rec.interimResults = false;
       rec.maxAlternatives = 5;
-      let done = false;
+      let settled = false;
+      const finish = v => { if (settled) return; settled = true; activeRec = null; resolve(v); };
       rec.onresult = ev => {
-        done = true;
         const alts = [];
         const res = ev.results[0];
         for (let i = 0; i < res.length; i++) alts.push(res[i].transcript);
-        resolve(alts);
+        finish(cancelled ? null : alts);
       };
-      rec.onerror = ev => { if (!done) reject(new Error(ev.error || "sr-error")); };
-      rec.onend = () => { if (!done) resolve([]); };
-      try { rec.start(); } catch (e) { reject(e); }
+      rec.onerror = ev => {
+        // a cancelled or empty attempt is not an error the user should see
+        if (cancelled || ev.error === "aborted" || ev.error === "no-speech") return finish(cancelled ? null : []);
+        if (settled) return;
+        settled = true; activeRec = null;
+        reject(new Error(ev.error || "sr-error"));
+      };
+      rec.onend = () => finish(cancelled ? null : []);
+      activeRec = rec;
+      try { rec.start(); } catch (e) { activeRec = null; settled = true; reject(e); }
       // hard stop after 6s
       setTimeout(() => { try { rec.stop(); } catch (e) {} }, 6000);
     });
@@ -208,10 +219,12 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mr = new MediaRecorder(stream);
+        activeRecorder = mr;
         const chunks = [];
         mr.ondataavailable = e => chunks.push(e.data);
         mr.onstop = () => {
           stream.getTracks().forEach(t => t.stop());
+          activeRecorder = null;
           resolve(new Blob(chunks, { type: mr.mimeType }));
         };
         mr.start();
@@ -238,10 +251,13 @@
 
   async function recognizeWhisper(statusCb) {
     const pipe = await loadWhisper();
+    if (cancelled) return null;
     if (statusCb) statusCb("rec");
     const blob = await recordAudio(3000);
+    if (cancelled) return null;
     if (statusCb) statusCb("proc");
     const pcm = await blobToPCM(blob);
+    if (cancelled) return null;
     const out = await pipe(pcm, { language: "japanese", task: "transcribe" });
     return [out.text || ""];
   }
@@ -255,17 +271,37 @@
     return null;
   }
 
-  // High-level: listen once, resolve list of transcripts.
+  // High-level: listen once. Resolves with a list of transcripts, [] if nothing
+  // was heard, or null if the attempt was cancelled (a second tap on the mic).
   // statusCb("rec"|"proc")
   async function listen(statusCb) {
+    if (listening) return null;              // already running — cancel() instead
     const eng = engineNow();
     if (!eng) throw new Error("no-engine");
-    if (eng === "webspeech") {
-      if (statusCb) statusCb("rec");
-      return await recognizeWebSpeech();
+    cancelled = false; listening = true;
+    try {
+      if (eng === "webspeech") {
+        if (statusCb) statusCb("rec");
+        return await recognizeWebSpeech();
+      }
+      return await recognizeWhisper(statusCb);
+    } finally {
+      listening = false;
     }
-    return await recognizeWhisper(statusCb);
   }
 
-  window.Voice = { speak, hasTTS, matches, normJa, variants, anyEngineMaybe, engineNow, listen, loadWhisper, whisperEnabled };
+  // Stop an attempt in progress without grading it (user tapped the mic again,
+  // left the screen, or started playing the model pronunciation).
+  function cancel() {
+    if (!listening && !activeRec && !activeRecorder) return false;
+    cancelled = true;
+    if (activeRec) { try { activeRec.abort(); } catch (e) {} activeRec = null; }
+    if (activeRecorder) { try { activeRecorder.stop(); } catch (e) {} activeRecorder = null; }
+    listening = false;
+    return true;
+  }
+  function isListening() { return listening; }
+
+  window.Voice = { speak, hasTTS, matches, normJa, variants, anyEngineMaybe, engineNow,
+                   listen, cancel, isListening, loadWhisper, whisperEnabled };
 })();

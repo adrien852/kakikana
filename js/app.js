@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.2.0";
+  window.APP_VERSION = "1.3.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -21,6 +21,7 @@
     root._onClose = onClose;
   }
   function closeModal(cb) {
+    if (window.Voice) Voice.cancel();
     const root = document.getElementById("modal-root");
     const f = cb || root._onClose;
     root.innerHTML = ""; root._onClose = null;
@@ -73,6 +74,7 @@
   const tabs = { home: renderHome, library: () => Library.render(), exam: () => Exam.render(), settings: () => Settings.render() };
   function go(name) {
     // stop anything that might render itself over the new screen
+    if (window.Voice) Voice.cancel();
     if (window.Session && Session.stop) Session.stop();
     if (window.Exam && Exam.stop) Exam.stop();
     closeModal();

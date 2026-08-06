@@ -172,11 +172,21 @@
         </div>
       </div>`);
     document.getElementById("sess-quit").onclick = quit;
-    document.getElementById("v-listen").onclick = () => Voice.speak(target);
-    document.getElementById("sess-skip").onclick = () => { idx++; next(); };
+    document.getElementById("sess-skip").onclick = () => { Voice.cancel(); idx++; next(); };
 
     const mic = document.getElementById("v-mic");
     const status = document.getElementById("v-status");
+    const listenBtn = document.getElementById("v-listen");
+
+    // playing the model out loud while the mic is open would validate the exercise
+    // for the learner, so the two are mutually exclusive.
+    function setRecording(on) {
+      mic.classList.toggle("rec", on);
+      listenBtn.disabled = on;
+      listenBtn.classList.toggle("is-disabled", on);
+      status.textContent = on ? t("mic_listening") : t("mic_start");
+    }
+    listenBtn.onclick = () => { if (!Voice.isListening()) Voice.speak(target); };
 
     if (!Voice.engineNow()) {
       status.textContent = t("voice_unavailable");
@@ -185,16 +195,24 @@
     }
 
     mic.onclick = async () => {
-      mic.classList.add("rec");
-      status.textContent = t("mic_listening");
+      // second tap = pause the attempt (time to think); nothing is graded
+      if (Voice.isListening()) {
+        Voice.cancel();
+        setRecording(false);
+        status.textContent = t("mic_paused");
+        flash("", "");
+        return;
+      }
+      setRecording(true);
       document.getElementById("v-heard").textContent = "";
+      flash("", "");
       try {
         const alts = await Voice.listen(st => {
-          status.textContent = st === "proc" ? t("mic_check") : t("mic_listening");
-          if (st === "proc") mic.classList.remove("rec");
+          if (st === "proc") { mic.classList.remove("rec"); status.textContent = t("mic_check"); }
         });
-        mic.classList.remove("rec");
-        status.textContent = t("mic_start");
+        setRecording(false);
+        if (alts === null) { status.textContent = t("mic_paused"); return; }   // cancelled
+        if (!alts.length) { status.textContent = t("voice_nothing"); return; } // silence: no penalty
         const heard = alts.filter(Boolean).join(" / ");
         document.getElementById("v-heard").textContent = heard ? `${t("heard")} ${heard}` : "";
         const ok = alts.some(a => Voice.matches(a, accepts));
@@ -218,8 +236,8 @@
           Voice.speak(target);
         }
       } catch (e) {
-        mic.classList.remove("rec");
-        status.textContent = t("voice_unavailable");
+        setRecording(false);
+        status.textContent = Voice.engineNow() ? t("voice_error") : t("voice_unavailable");
       }
     };
   }
@@ -244,6 +262,7 @@
   function stop() {
     live = false; advancing = false;
     if (current) { current.destroy(); current = null; }
+    if (window.Voice) Voice.cancel();
     try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
   }
 

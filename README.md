@@ -38,6 +38,14 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.3.0
+
+- **Practise pronunciation anywhere in the library.** Open any kana or kanji and tap 🎤 next to a character or example word to say it out loud — the app tells you straight away whether it came out right, and what it heard if not.
+- **Fixed:** tapping the microphone a second time wrongly reported "speech recognition unavailable (offline)". A second tap now simply pauses the attempt, so you can take your time thinking, then tap again to record.
+- **Fixed:** the 🔊 model pronunciation could be played while the microphone was open, which passed the exercise for you. The listen button is now locked while recording (and everywhere in the library too).
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.2.0
 
 - **Pronunciation is no longer marked wrong when it was right.** Speech recognition writes numbers as digits ("2つ") and words in kanji ("朝" for あさ), which the app then failed to recognise. Every way of saying or writing a number is now treated as one and the same, and standard spellings are accepted throughout the vocabulary — while a *different* number or a neighbouring word (四月 vs 七月, お父さん vs お母さん) is still correctly rejected.

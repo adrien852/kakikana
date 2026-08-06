@@ -6,6 +6,83 @@
 
   function t(k) { return App.t(k); }
 
+  // ---------- pronunciation practice inside the library ----------
+  // Any 🎤 button carries the accepted answers; tapping it records, tapping it
+  // again cancels. While recording, every 🔊 button is locked so the model
+  // pronunciation can't be used to pass the attempt.
+  function micBtn(accepts, extraClass) {
+    return `<button class="mic-mini ${extraClass || ""}" data-mic="${encodeURIComponent(JSON.stringify(accepts))}" title="${t("practice_say")}">🎤</button>`;
+  }
+
+  function lockSpeakers(on) {
+    document.querySelectorAll("[data-say]").forEach(b => {
+      b.disabled = on; b.classList.toggle("is-disabled", on);
+    });
+  }
+
+  function statusLine(btn) {
+    const row = btn.closest(".word-row") || btn.closest(".detail-head") || btn.parentElement;
+    document.querySelectorAll(".practice-status").forEach(el => { if (el !== row.nextElementSibling) el.remove(); });
+    let el = row.nextElementSibling;
+    if (!el || !el.classList.contains("practice-status")) {
+      el = document.createElement("div");
+      el.className = "practice-status";
+      row.parentNode.insertBefore(el, row.nextSibling);
+    }
+    return el;
+  }
+
+  function wirePractice(root) {
+    root.querySelectorAll("[data-say]").forEach(b =>
+      b.onclick = () => { if (!Voice.isListening()) Voice.speak(b.dataset.say); });
+
+    root.querySelectorAll("[data-mic]").forEach(btn => {
+      btn.onclick = async () => {
+        const out = statusLine(btn);
+        // second tap on the same button (or any other) cancels the attempt
+        if (Voice.isListening()) {
+          Voice.cancel();
+          root.querySelectorAll("[data-mic]").forEach(b => b.classList.remove("rec"));
+          lockSpeakers(false);
+          out.className = "practice-status muted";
+          out.textContent = t("mic_paused");
+          return;
+        }
+        if (!Voice.engineNow()) {
+          out.className = "practice-status bad";
+          out.textContent = t("voice_unavailable");
+          return;
+        }
+        const accepts = JSON.parse(decodeURIComponent(btn.dataset.mic));
+        btn.classList.add("rec");
+        lockSpeakers(true);
+        out.className = "practice-status muted";
+        out.textContent = t("mic_listening");
+        try {
+          const alts = await Voice.listen(st => {
+            if (st === "proc") { btn.classList.remove("rec"); out.textContent = t("mic_check"); }
+          });
+          btn.classList.remove("rec");
+          lockSpeakers(false);
+          if (alts === null) { out.className = "practice-status muted"; out.textContent = t("mic_paused"); return; }
+          if (!alts.length) { out.className = "practice-status muted"; out.textContent = t("voice_nothing"); return; }
+          const ok = alts.some(a => Voice.matches(a, accepts));
+          const heard = alts.filter(Boolean)[0] || "";
+          sfx(ok ? "right" : "bad");
+          out.className = "practice-status " + (ok ? "good" : "bad");
+          out.textContent = ok ? "✓ " + t("voice_correct") : "✗ " + t("voice_retry") + (heard ? ` — ${t("heard")} ${heard}` : "");
+          btn.classList.add(ok ? "flash-good" : "flash-bad");
+          setTimeout(() => btn.classList.remove("flash-good", "flash-bad"), 900);
+        } catch (e) {
+          btn.classList.remove("rec");
+          lockSpeakers(false);
+          out.className = "practice-status bad";
+          out.textContent = Voice.engineNow() ? t("voice_error") : t("voice_unavailable");
+        }
+      };
+    });
+  }
+
   function render() {
     const v = document.getElementById("view");
     v.innerHTML = `<h1>${t("tab_library")}</h1>
@@ -53,12 +130,14 @@
     const st = Engine.status(ch);
     const p = Engine.state.chars[ch];
     const canDraw = !!window.STROKES[ch];
+    const canSay = ch !== "ー";
     const lang = Engine.state.lang;
     const exHtml = k.ex ? `
       <div class="kv"><div class="k">${t("ex_word")}</div>
         <div class="word-row"><div class="word-jp jp">${k.ex.jp}</div>
           <div class="word-info"><div class="word-sub">${k.ex.r} — ${lang === "fr" ? k.ex.fr : k.ex.en}</div></div>
           <button class="speak-btn" style="width:40px;height:40px;font-size:18px" data-say="${k.ex.jp}">🔊</button>
+          ${micBtn([k.ex.jp, k.ex.r])}
         </div></div>` : "";
     const originHtml = k.origin ? `<div class="kv"><div class="k">${t("origin_kana")}</div><div class="v jp">${k.origin}</div></div>` : "";
     App.modal(`
@@ -67,15 +146,19 @@
         <div class="detail-meta">
           <div class="detail-romaji">${k.r}</div>
           <div class="detail-fr"><span class="pill ${st}">${t("status_" + st)}</span></div>
-          <button class="btn secondary small mt8" data-say="${ch}">🔊 ${t("listen")}</button>
+          <div class="mt8" style="display:flex;gap:8px;align-items:center">
+            <button class="btn secondary small" data-say="${ch}">🔊 ${t("listen")}</button>
+            ${canSay ? micBtn([ch, k.r]) : ""}
+          </div>
         </div>
       </div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">${Voice.anyEngineMaybe() ? t("practice_hint") : ""}</div>
       ${originHtml}${exHtml}
       ${p ? `<div class="kv"><div class="k">${t("progress")}</div><div class="v">${p.succ || 0} ✓ · ${p.fail || 0} ✗ · ${p.unaided || 0} ${t("stats_mastered")}</div></div>` : ""}
       ${st !== "mastered" ? `<button class="btn secondary mt8" id="d-known">${t("mark_known")}</button>`
         : (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "")}
     `, () => { if (animWriter) animWriter = null; });
-    document.querySelectorAll("[data-say]").forEach(b => b.onclick = () => Voice.speak(b.dataset.say));
+    wirePractice(document.getElementById("modal-root"));
     const kn = document.getElementById("d-known");
     if (kn) kn.onclick = () => { Engine.markKnown(ch, true); App.closeModal(); render(); };
     const knu = document.getElementById("d-known-un");
@@ -144,6 +227,7 @@
           <div class="word-sub"><b>${lang === "fr" ? w[3] : w[4]}</b></div>
         </div>
         <button class="speak-btn" style="width:40px;height:40px;font-size:18px" data-say="${w[1]}">🔊</button>
+        ${micBtn([w[0], w[1], w[2]])}
       </div>`).join("");
     const s = k.s;
     const sentence = `
@@ -167,6 +251,7 @@
           ${active ? `<span class="pill learning">✏️ ${t("in_practice")}</span>` : ""}</div>
         </div>
       </div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">${Voice.anyEngineMaybe() ? t("practice_hint") : ""}</div>
       ${onH}${kunH}
       <div class="kv"><div class="k">${t("etym")}</div>
         <div class="v"><span class="etype-tag">${t("etype_" + k.etype)}</span><br>${lang === "fr" ? k.etf : k.ete}</div></div>
@@ -176,7 +261,7 @@
       ${st !== "mastered" ? `<button class="btn secondary mt8" id="d-known">${t("mark_known")}</button>` :
         (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "")}
     `);
-    document.querySelectorAll("[data-say]").forEach(b => b.onclick = () => Voice.speak(b.dataset.say));
+    wirePractice(document.getElementById("modal-root"));
     const kn = document.getElementById("d-known");
     if (kn) kn.onclick = () => { Engine.markKnown(ch, true); App.closeModal(); render(); };
     const knu = document.getElementById("d-known-un");

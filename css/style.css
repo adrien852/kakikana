@@ -171,6 +171,21 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .word-info { flex: 1; min-width: 0; }
 .word-sub { font-size: 12.5px; color: var(--ink-soft); }
 .etype-tag { display: inline-block; background: #efe7d8; color: #7a6a4f; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; margin-bottom: 6px; }
+.mic-mini {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%;
+  border: 1.5px solid var(--line); background: var(--card); color: var(--red);
+  font-size: 18px; cursor: pointer; transition: transform .12s, background .2s;
+}
+.mic-mini:active { transform: scale(.92); }
+.mic-mini.rec { background: var(--green); border-color: var(--green); animation: pulse 1s infinite; }
+.mic-mini.flash-good { background: #d9f0e3; border-color: var(--green); }
+.mic-mini.flash-bad { background: #fbe9e7; border-color: var(--red); }
+.practice-status { font-size: 13px; font-weight: 600; margin: 6px 2px 2px; }
+.practice-status.good { color: var(--green); }
+.practice-status.bad { color: var(--red); }
+.practice-status.muted { color: var(--ink-soft); font-weight: 400; }
+.is-disabled, button:disabled { opacity: .4; pointer-events: none; }
+
 /* ---- exam ---- */
 .choices { display: grid; gap: 10px; margin-top: 14px; }
 .choice {
