@@ -137,10 +137,9 @@
   function countAtLeast(list, minBox) {
     return list.filter(k => { const p = S.chars[k.k]; return p && (p.box >= minBox || p.mastered || p.known); }).length;
   }
-  function katakanaUnlocked() { return countAtLeast(HIRA_BASE, 2) >= 28; }
-  function kanjiUnlocked() {
-    return countAtLeast(HIRA_BASE, 2) >= 42 && countAtLeast(KATA_BASE, 2) >= 32;
-  }
+  // v1.1: all tracks are freely available — no unlock requirements.
+  function katakanaUnlocked() { return true; }
+  function kanjiUnlocked() { return true; }
 
   function refillActiveKanji() {
     const max = S.settings.activeKanji;
@@ -183,53 +182,63 @@
   }
 
   // ---- session builder ----
+  // suggested focus for the mixed session: hiragana first, then katakana, then kanji
   function currentTrack() {
-    if (!katakanaUnlocked()) return "hiragana";
-    if (!kanjiUnlocked()) {
-      // still new katakana to learn?
-      if (nextNewKana("katakana", 1).length) return "katakana";
-      return "katakana";
-    }
+    if (nextNewKana("hiragana", 1).length && countAtLeast(HIRA_BASE, 2) < 28) return "hiragana";
+    if (nextNewKana("katakana", 1).length) return "katakana";
     return "kanji";
   }
 
-  function buildSession() {
+  // track: "hiragana" | "katakana" | "kanji" | undefined (mixed)
+  function buildSession(track) {
     const items = [];
-    const track = currentTrack();
-    const allKana = HIRA_ALL.concat(KATA_ALL).map(k => k.k).filter(c => window.STROKES[c]);
+    const hira = HIRA_ALL.map(k => k.k).filter(c => window.STROKES[c]);
+    const kata = KATA_ALL.map(k => k.k).filter(c => window.STROKES[c]);
     const allKanji = KANJI.map(k => k.k);
+    const pool =
+      track === "hiragana" ? hira :
+      track === "katakana" ? kata :
+      track === "kanji" ? allKanji :
+      hira.concat(kata, allKanji);
 
-    // 1) due reviews (kana + kanji learning items)
-    let due = dueChars(allKana.concat(allKanji));
+    // 1) due reviews from the chosen pool
+    let due = dueChars(pool);
     due.sort((a, b) => (S.chars[a].due - S.chars[b].due));
     due.slice(0, 7).forEach(ch => items.push({ type: "draw", ch, tag: "review" }));
 
-    // 2) active kanji practice (if kanji track unlocked)
-    if (kanjiUnlocked()) {
+    // 2) active kanji practice (kanji or mixed session)
+    if (!track || track === "kanji") {
       refillActiveKanji();
       S.kanjiActive.forEach(ch => {
         if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: P(ch).enc === 0 ? "new" : "review" });
       });
     }
 
-    // 3) new kana intro — interleave syllabaries so neither stalls
-    if (track !== "kanji") {
+    // 3) new character intros
+    if (track === "hiragana" || track === "katakana") {
       const room = Math.max(0, 10 - items.length);
-      const n = Math.min(3, Math.max(1, room));
-      const other = track === "hiragana" ? "katakana" : "hiragana";
-      let picks = nextNewKana(track, katakanaUnlocked() ? Math.max(1, n - 1) : n);
-      if (picks.length < n && (other === "hiragana" || katakanaUnlocked())) {
-        nextNewKana(other, n - picks.length).forEach(c => { if (!picks.includes(c)) picks.push(c); });
+      nextNewKana(track, Math.min(3, Math.max(1, room)))
+        .forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
+    } else if (!track) {
+      // mixed: follow the suggested focus, interleaving syllabaries so neither stalls
+      const focus = currentTrack();
+      if (focus !== "kanji") {
+        const room = Math.max(0, 10 - items.length);
+        const n = Math.min(3, Math.max(1, room));
+        const other = focus === "hiragana" ? "katakana" : "hiragana";
+        let picks = nextNewKana(focus, Math.max(1, n - 1));
+        if (picks.length < n) {
+          nextNewKana(other, n - picks.length).forEach(c => { if (!picks.includes(c)) picks.push(c); });
+        }
+        picks.forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
+      } else {
+        const leftovers = nextNewKana("hiragana", 1).concat(nextNewKana("katakana", 1));
+        leftovers.slice(0, 1).forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
       }
-      picks.forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
-    } else {
-      // kanji track: keep finishing any remaining kana, one per session
-      const leftovers = nextNewKana("hiragana", 1).concat(nextNewKana("katakana", 1));
-      leftovers.slice(0, 1).forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
     }
 
-    // 4) mastered consolidation (1-2)
-    dueMastered(allKana.concat(allKanji), 2).forEach(ch => {
+    // 4) mastered consolidation (1-2) from the chosen pool
+    dueMastered(pool, 2).forEach(ch => {
       if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: "mastered" });
     });
 
@@ -242,10 +251,12 @@
     // cap ~14, keep at least something
     let list = items.slice(0, 14);
     if (!list.length) {
-      // nothing due: consolidate random learned chars
-      const learned = allKana.concat(allKanji).filter(ch => S.chars[ch] && S.chars[ch].enc > 0);
+      // nothing due: consolidate random learned chars from the pool
+      const learned = pool.filter(ch => S.chars[ch] && S.chars[ch].enc > 0);
       shuffle(learned).slice(0, 8).forEach(ch => list.push({ type: "draw", ch, tag: "review" }));
-      if (!list.length) nextNewKana("hiragana", 3).forEach(ch => list.push({ type: "draw", ch, tag: "new" }));
+      if (!list.length && track !== "kanji") {
+        nextNewKana(track || "hiragana", 3).forEach(ch => list.push({ type: "draw", ch, tag: "new" }));
+      }
     }
     // interleave: new items spread out
     return interleave(list);

@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.0.0";
+  window.APP_VERSION = "1.1.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -33,24 +33,21 @@
     const hs = Engine.trackStats("hiragana");
     const ks = Engine.trackStats("katakana");
     const js = Engine.trackStats("kanji");
-    const kataOpen = Engine.katakanaUnlocked();
-    const kanjiOpen = Engine.kanjiUnlocked();
     const due = Engine.totalDue();
     const streak = Engine.state.streak.count;
     const active = Engine.state.kanjiActive;
 
-    function trackCard(cls, ico, title, stats, open, lockMsg) {
+    function trackCard(track, cls, ico, title, stats) {
       const pct = Math.round(100 * (stats.known || 0) / stats.total);
-      return `<div class="card">
+      return `<div class="card track-start" data-track="${track}" style="cursor:pointer">
         <div class="track-row">
-          <div class="track-badge ${open ? cls : "locked"}">${open ? ico : "🔒"}</div>
+          <div class="track-badge ${cls}">${ico}</div>
           <div class="track-info">
             <div class="track-title">${title}</div>
-            <div class="track-sub">${open
-              ? `${stats.seen}/${stats.total} ${t("stats_seen")} · ${stats.mastered} ${t("stats_mastered")}`
-              : lockMsg}</div>
+            <div class="track-sub">${stats.seen}/${stats.total} ${t("stats_seen")} · ${stats.mastered} ${t("stats_mastered")}</div>
             <div class="pbar"><div style="width:${pct}%"></div></div>
           </div>
+          <div style="color:var(--ink-soft);font-size:20px">▶</div>
         </div>
       </div>`;
     }
@@ -62,11 +59,14 @@
         ${active.length ? `<div style="font-size:26px;margin-bottom:10px" class="jp">${active.join("　")}</div>` : ""}
         <button class="btn" style="background:#fff;color:#b7392b" id="btn-session">▶ ${t("start_session")}</button>
       </div>
-      ${trackCard("h", "あ", t("hiragana"), hs, true, "")}
-      ${trackCard("k", "ア", t("katakana"), ks, kataOpen, t("locked_katakana"))}
-      ${trackCard("j", "字", t("kanji"), js, kanjiOpen, t("locked_kanji"))}
+      <p class="muted" style="font-size:12.5px;margin:2px 2px 10px">${t("tap_track")}</p>
+      ${trackCard("hiragana", "h", "あ", t("hiragana"), hs)}
+      ${trackCard("katakana", "k", "ア", t("katakana"), ks)}
+      ${trackCard("kanji", "j", "字", t("kanji"), js)}
       <p class="muted center" style="font-size:12.5px">${t("install_hint")}</p>`;
     document.getElementById("btn-session").onclick = () => { setTab(null); Session.start(); };
+    v.querySelectorAll(".track-start").forEach(c =>
+      c.onclick = () => { setTab(null); Session.start(c.dataset.track); });
   }
 
   // ---------- navigation ----------

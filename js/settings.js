@@ -22,7 +22,7 @@
       <div class="card">
         <div class="set-row">
           <div class="set-lbl">${t("set_active_kanji")}</div>
-          <select id="set-active">${[2, 3, 4, 5].map(n => `<option ${st.activeKanji === n ? "selected" : ""}>${n}</option>`).join("")}</select>
+          <select id="set-active">${[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option ${st.activeKanji === n ? "selected" : ""}>${n}</option>`).join("")}</select>
         </div>
         <div class="set-row">
           <div class="set-lbl">${t("set_mastery_reps")}</div>

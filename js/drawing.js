@@ -1,6 +1,6 @@
 // ===== Stroke drawing exercise (hanzi-writer wrapper with fading help) =====
 (function () {
-  const LENIENCY = { easy: 1.4, normal: 1.0, hard: 0.75 };
+  const LENIENCY = { easy: 2.2, normal: 1.5, hard: 1.0 };
 
   function gridSVG(size) {
     const s = size, h = s / 2;
@@ -54,7 +54,8 @@
       drawingWidth: Math.max(8, size * 0.045),
       highlightColor: "#c9a227",
       highlightCompleteColor: "#3d8b5f",
-      leniency: LENIENCY[strict] || 1.0,
+      leniency: LENIENCY[strict] || 1.5,
+      averageDistanceThreshold: 420,
       showHintAfterMisses: conf.hintAfter === false ? false : conf.hintAfter,
       markStrokeCorrectAfterMisses: conf.autoPass === false ? false : conf.autoPass,
       acceptBackwardsStrokes: false,

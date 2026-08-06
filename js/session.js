@@ -3,11 +3,13 @@
   let items = [], idx = 0, score = { ok: 0, total: 0 };
   let current = null; // mounted drawing
   let advancing = false;
+  let curTrack = null; // null = mixed, or "hiragana"|"katakana"|"kanji"
 
   function t(key) { return window.App.t(key); }
 
-  function start() {
-    items = Engine.buildSession();
+  function start(track) {
+    curTrack = track || null;
+    items = Engine.buildSession(curTrack);
     idx = 0; score = { ok: 0, total: 0 };
     Engine.bumpStreak();
     next();
@@ -219,7 +221,7 @@
       <button class="btn mt16" id="sess-again">${t("start_session")}</button>
       <button class="btn ghost mt8" id="sess-home">${t("back")}</button>
     </div>`;
-    document.getElementById("sess-again").onclick = start;
+    document.getElementById("sess-again").onclick = () => start(curTrack);
     document.getElementById("sess-home").onclick = () => App.go("home");
   }
 

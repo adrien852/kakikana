@@ -38,6 +38,15 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.1.0
+
+- **Stroke detection rewritten for loop characters** (ね, ぬ, む, め, あ, る, す, よ, ま, み, お, を…): the reference stroke paths contained hidden discontinuities that made correct loops nearly impossible to validate. They have been rebuilt and verified for all 151 kana.
+- **More forgiving validation overall** at every strictness level (Indulgent / Normal / Strict all relaxed one notch; wrong characters and wrong stroke directions are still rejected).
+- **Free choice of track**: tap the Hiragana, Katakana or Kanji card on the home screen to start a focused session in that category — no more unlock requirements. The main button still gives a mixed session.
+- **Up to 10 kanji** can now be studied at the same time (Réglages → Rythme d'apprentissage).
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## Features
 
 - **Drawing practice** with real stroke validation (order, direction and shape), based on official stroke-order data. Help fades as you progress: model tracing → light guidance → drawing from memory. Hints appear only after a couple of failed attempts.
