@@ -72,6 +72,8 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .pill.known { background: #d9ecff; color: var(--blue); }
 .pill.mastered { background: #d9f0e3; color: var(--green); }
 .pill.dictation { background: #e4e0f5; color: #5b4b9e; }
+.pill.hira { background: #f7ddd8; color: #8f2b20; }
+.pill.kata { background: #d9ecff; color: #2b5570; }
 /* ---- session ---- */
 .session-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .session-top .pbar { flex: 1; margin-top: 0; }

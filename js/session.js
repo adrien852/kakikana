@@ -43,6 +43,13 @@
     return `<span class="pill known">${t("review")}</span>`;
   }
 
+  // in a mixed session あ and ア look like the same request without this
+  function scriptLabel(type) {
+    if (type === "hiragana") return `<span class="pill hira">あ ${t("hiragana")}</span>`;
+    if (type === "katakana") return `<span class="pill kata">ア ${t("katakana")}</span>`;
+    return "";
+  }
+
   // ---------- drawing item ----------
   function renderDraw(it) {
     const ch = it.ch;
@@ -60,8 +67,7 @@
     let promptMain, promptSub = "", speakText = null;
     if (dictation) {
       promptMain = t("dictation_prompt");
-      promptSub = type === "kanji" ? t("dictation_sub_kanji")
-        : `${t(type)} — ${t("dictation_sub_kana")}`;
+      promptSub = type === "kanji" ? t("dictation_sub_kanji") : t("dictation_sub_kana");
       speakText = dictation.r;
     } else if (type === "kanji") {
       const lang = Engine.state.lang;
@@ -80,7 +86,7 @@
     const v = document.getElementById("view");
     v.innerHTML = header(`
       <div class="prompt" id="prompt-box">
-        <div>${tagLabel(it.tag)}${dictation ? ` <span class="pill dictation">🎧 ${t("dictation_pill")}</span>` : ""}</div>
+        <div>${tagLabel(it.tag)} ${scriptLabel(type)}${dictation ? ` <span class="pill dictation">🎧 ${t("dictation_pill")}</span>` : ""}</div>
         <div class="p-main mt8">${promptMain}</div>
         <div class="p-sub">${promptSub}</div>
       </div>
@@ -134,9 +140,10 @@
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
         // kanji: writing and pronunciation are two halves of the same encounter
-        let speakPhase = type === "kanji" && Engine.state.settings.voiceOn && Voice.engineNow();
+        const voiceWord = type === "kanji" ? Engine.kanjiVoiceWord(kanji) : null;
+        let speakPhase = !!voiceWord && Engine.state.settings.voiceOn && Voice.engineNow();
         // after a dictation, asking for the very word just played adds nothing
-        if (speakPhase && dictation && kanji.w[0] && kanji.w[0][1] === dictation.r) speakPhase = false;
+        if (speakPhase && dictation && voiceWord[1] === dictation.r) speakPhase = false;
         setTimeout(() => {
           if (!advancing || !live) return;
           if (speakPhase) renderVoice({ ch, type: "voice" }, true);
@@ -184,12 +191,13 @@
     // for kanji: pronounce its first example word; for kana: syllable or its example word
     let target, display, accepts;
     if (type === "kanji") {
-      const w = kanji.w[0];
+      // the longest example word: short ones are not reliably recognised
+      const w = Engine.kanjiVoiceWord(kanji);
+      if (!w) { idx++; return next(); }
       target = w[1]; display = w[0];
       accepts = [w[0], w[1], w[2]];
     } else {
-      // never a bare kana: too short to recognise, so always its example word
-      const ex = Engine.kanaVoiceWord(ch);
+      const ex = Engine.kanaVoiceWord(ch, 3);
       if (!ex) { idx++; return next(); }
       target = ex.jp; display = ex.jp;
       accepts = [ex.jp, ex.r];
@@ -205,6 +213,7 @@
             <span class="phase active">2. ${t("phase_say")}</span>
           </div>` : ""}
         <div class="p-main mt16">${t("say_prompt")}</div>
+        <div class="muted" style="font-size:12.5px">${t("voice_no_penalty")}</div>
         <div class="voice-char jp">${display}</div>
         <button class="btn secondary small" id="v-listen">🔊 ${t("listen")}</button>
         <button class="mic-btn" id="v-mic">🎤</button>
@@ -282,14 +291,12 @@
           sfx("right");
           flash(t("voice_correct"), "good");
           Engine.recordVoice(ch, true);
-          score.total++; score.ok++;
           setTimeout(() => { if (live) { idx++; next(); } }, 1200);
         } else if (attempts >= 3) {
           lockPanel();
           sfx("bad");
           flash(t("voice_close"), "bad");
           Engine.recordVoice(ch, false);
-          score.total++;
           Voice.speak(target);
           setTimeout(() => { if (live) { idx++; next(); } }, 2200);
         } else {

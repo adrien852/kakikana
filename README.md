@@ -38,6 +38,14 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.6.0
+
+- **Pronunciation never affects your progress.** A missed or skipped pronunciation is now completely inert: it cannot move a character's stage, review date or mastery — only your writing does that. It no longer counts in the end-of-session score either, and the exercise says so on screen.
+- **No more unrecognisably short words.** The pronunciation exercise now always asks for the longest example word of at least three morae, so 十 asks for 十月 (じゅうがつ) instead of とお, 目 for 目ぐすり instead of め, 手 for 手がみ instead of て. Two kanji (今, 下) have no word long enough and simply skip pronunciation. The same three-mora rule applies to kana words in sessions; the library still lets you try any word on demand.
+- **Stroke exercises say which alphabet.** Hiragana and katakana prompts now carry a colour-coded 「あ Hiragana」/「ア Katakana」badge, so a mixed session never leaves you guessing which one "i" means.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.5.1
 
 - **No more pronunciation checks on a single kana.** One mora ("お", "え") is too short for any recogniser to identify, so those attempts failed even when they were perfect. Kana pronunciation is now only ever practised through a real example word (あさ, いぬ, アイス…) — in sessions and in the library. The 🔊 listen button on a character is unchanged, and kana dictation (hearing a character and writing it) is unaffected.

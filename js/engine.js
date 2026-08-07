@@ -54,13 +54,24 @@
   HIRA_ALL.concat(KATA_ALL).forEach(k => KANA_MAP[k.k] = k);
   window.KANA.hiragana.small.concat(window.KANA.katakana.small).forEach(k => KANA_MAP[k.k] = k);
 
-  // A single kana is one mora — far too short for any recogniser to identify
-  // reliably ("お" comes back as anything). Kana pronunciation is therefore only
-  // ever practised through a real example word.
-  function kanaVoiceWord(ch) {
+  // Speech recognition needs something to work with: one or two morae ("め",
+  // "とお") come back as anything at all. Pronunciation exercises therefore only
+  // ever use a word of at least three morae, and always the longest one available.
+  const MIN_VOICE_MORAE = 3;
+  function morae(s) {
+    return [...(s || "")].filter(c => "ゃゅょぁぃぅぇぉャュョァィゥェォ".indexOf(c) < 0).length;
+  }
+  // min defaults to 2: the library lets you try any example word, sessions ask for 3+
+  function kanaVoiceWord(ch, min) {
     const k = KANA_MAP[ch];
     if (!k || !k.ex || !k.ex.jp) return null;
-    return [...k.ex.jp].length > 1 ? k.ex : null;
+    return morae(k.ex.jp) >= (min === undefined ? 2 : min) ? k.ex : null;
+  }
+  // the longest of a kanji's example words, or null when none is long enough
+  function kanjiVoiceWord(k) {
+    if (!k || !k.w || !k.w.length) return null;
+    const best = k.w.slice().sort((a, b) => morae(b[1]) - morae(a[1]))[0];
+    return best && morae(best[1]) >= MIN_VOICE_MORAE ? best : null;
   }
 
   // ---- dictation ----------------------------------------------------------
@@ -137,10 +148,13 @@
     save();
   }
 
+  // Pronunciation is practice, never assessment: recognition is too unreliable for
+  // a miss — or a skip — to cost anything. Nothing here touches stage, box, due
+  // dates or mastery; only a tally is kept.
   function recordVoice(ch, ok) {
     const p = P(ch);
-    p.lastSeen = Date.now();
-    if (ok && p.box < BOX_DAYS.length - 1) { p.box++; p.due = Date.now() + BOX_DAYS[p.box] * DAY; }
+    p.voiceTry = (p.voiceTry || 0) + 1;
+    if (ok) p.voiceOk = (p.voiceOk || 0) + 1;
     save();
   }
 
@@ -343,7 +357,8 @@
     // 5) voice items on well-known chars
     if (S.settings.voiceOn && window.Voice && window.Voice.anyEngineMaybe()) {
       const cands = items
-        .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2 && kanaVoiceWord(i.ch))
+        .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2 &&
+                     kanaVoiceWord(i.ch, MIN_VOICE_MORAE))
         .map(i => i.ch);
       shuffle(cands).slice(0, 2).forEach(ch => items.push({ type: "voice", ch }));
     }
@@ -453,7 +468,7 @@
     save, P, status, charType,
     KANJI, KANJI_MAP, KANA_MAP, HIRA_BASE, HIRA_ALL, KATA_BASE, KATA_ALL,
     recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
-    dictationInfo, dictationMode, kanaVoiceWord,
+    dictationInfo, dictationMode, kanaVoiceWord, kanjiVoiceWord,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, trackStats, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll
