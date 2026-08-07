@@ -56,13 +56,14 @@
     const p = Engine.P(ch);
     const stage = it.tag === "reinforce" ? Math.max(p.stage, 1) : p.stage;
     const type = Engine.charType(ch);
-    const conf = Drawing.stageConfig(stage);
     const kana = Engine.KANA_MAP[ch];
     const kanji = Engine.KANJI_MAP[ch];
 
     // audio-first encounter: nothing on screen but the sound
     const dict = it.mode === "dictation" ? Engine.dictationInfo(ch) : null;
     const dictation = dict && Voice.hasTTS() ? dict : null;
+    // how much of the guide is still shown at this stage
+    const plan = Drawing.hintPlan(ch, stage, { dictation: !!dictation });
 
     let promptMain, promptSub = "", speakText = null;
     if (dictation) {
@@ -80,7 +81,8 @@
       promptMain = `<span class="p-big">${r}</span>`;
       speakText = ch;
       // (visual prompt: the romaji above)
-      promptSub = stage <= 0 ? t("draw_prompt_trace") : (stage <= 2 ? t("draw_prompt_guided") : t("draw_prompt_free"));
+      promptSub = plan.shown >= plan.total ? t("draw_prompt_trace")
+        : plan.shown > 0 ? t("draw_prompt_partial") : t("draw_prompt_free");
     }
 
     const v = document.getElementById("view");
@@ -94,7 +96,9 @@
         <button class="btn ${dictation ? "" : "secondary"} small" id="sess-speak" style="margin-bottom:10px">
           🔊 ${dictation ? t("replay") : t("listen")}</button>
         <div id="draw-container"></div>
-        <div class="stroke-count" id="stroke-count">${dictation ? "" : (window.STROKES[ch] ? window.STROKES[ch].strokes.length : "?") + " " + t("strokes_n")}</div>
+        <div class="stroke-count" id="stroke-count">${dictation ? "" :
+          plan.total + " " + t("strokes_n") + (plan.shown > 0 && plan.shown < plan.total
+            ? ` · ${(plan.shown === 1 ? t("hint_left_one") : t("hint_left").replace("{n}", plan.shown))}` : "")}</div>
         <div class="feedback" id="feedback"></div>
         <div class="session-actions">
           <button class="btn secondary small" id="sess-hint">${t("show_hint")}</button>
@@ -129,7 +133,8 @@
       onComplete: res => {
         const strokes = window.STROKES[ch] ? window.STROKES[ch].strokes.length : 1;
         const ok = res.totalMistakes <= Math.max(2, strokes);            // overall success
-        const unaided = stage >= 3 && !res.hintUsed && res.totalMistakes <= 2;
+        // "unaided" now means exactly that: no guide left on screen, no hint asked for
+        const unaided = plan.shown === 0 && !res.hintUsed && res.totalMistakes <= 2;
         const wasMastered = Engine.P(ch).mastered;
         Engine.recordDraw(ch, ok, unaided);
         const justMastered = !wasMastered && Engine.P(ch).mastered;
@@ -150,7 +155,7 @@
           else { idx++; next(); }
         }, 1300);
       }
-    });
+    }, { hintPlan: plan, dictation: !!dictation });
     // what the dictation was, shown once the answer is in (or on demand)
     function reveal() {
       const box = document.getElementById("prompt-box");

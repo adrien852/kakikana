@@ -88,6 +88,7 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
   touch-action: none;
 }
 #writer-grid { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+#writer-hint { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 #writer-target { position: relative; z-index: 1; }
 .stroke-count { margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
 .session-actions { display: flex; gap: 10px; margin-top: 14px; width: 100%; max-width: 340px; }

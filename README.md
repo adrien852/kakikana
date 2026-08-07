@@ -38,6 +38,14 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.7.0
+
+- **The stroke guide now fades away gradually** instead of switching off. Each time a character advances a stage, the outline recedes from the end: all strokes, then all but the last, then fewer still, then none — so you always recall the ending first and work backwards.
+- **Compounds fade by component.** For longer kanji the app finds where the character splits (語 → 言 | 吾, 時 → 日 | 寺, 休 → 亻 | 木) and uses that as one of the steps, so a middle stage shows exactly the left or top half and asks you to recall the rest. Characters of five strokes or fewer simply lose one stroke per stage. There are never more than four levels of help before it disappears — enough to be gradual, not enough to be a slog.
+- **Mastery now means what it says**: a drawing only counts as unaided when no guide is left on screen and you asked for no hint. Dictations and exams never show the guide at all.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.6.0
 
 - **Pronunciation never affects your progress.** A missed or skipped pronunciation is now completely inert: it cannot move a character's stage, review date or mastery — only your writing does that. It no longer counts in the end-of-session score either, and the exercise says so on screen.
