@@ -38,13 +38,19 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.9.1
+
+- **The reading is no longer written on the writing prompt.** The two buttons now say only 音 ON and 訓 KUN — tap either to hear it. Printing さん / *san* next to them handed you the answer to the pronunciation exercise that comes right after.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.9.0
 
 - **Pronunciation now asks for the kanji's own reading, not one of its example words.** Practising 一 used to mean saying 一月 (*ichigatsu*) and practising 二 meant 二つ (*futatsu*) — two words that sound nothing alike and teach the compound rather than the character. The exercise now shows the bare kanji and asks you to read it: 山 → *yama*, 私 → *watashi*, 父 → *chichi*, 見 → *miru*.
 - **A badge says which reading is wanted** (音 ON or 訓 KUN). Where both readings are everyday words — 一 is *ichi* and *hitotsu*, and so are 六, 七 and 八 — the two alternate, and neither stops coming up until you have said each of them right a few times.
 - **The meaning appears once you have said it.** Nothing is given away beforehand; the reading, its romaji and the translation are revealed on success (and after the third miss, alongside the model being played).
 - **A reading only becomes an exercise if it is a real word on its own, of at least two syllables, and in everyday use.** That leaves 81 of the 104 kanji with a spoken exercise. 日, 手, 目, 木, 火, 本 and sixteen others are practised by writing and dictation only: *hi*, *te*, *me*, *ki*, *hon* are single syllables that no recogniser identifies reliably, and 男's ON reading *dan* or 社's KUN reading *yashiro* are almost never said alone.
-- **The writing prompt offers both readings, each labelled and with its romaji.** 三 used to play *mittsu* here and ask for *san* in dictation with nothing to explain the difference; now you can hear 音 ON さん and 訓 KUN みっつ side by side, and the dictation reveal says which one you just heard.
+- **The writing prompt offers both readings, each labelled.** 三 used to play *mittsu* here and ask for *san* in dictation with nothing to explain the difference; now you can hear 音 ON さん and 訓 KUN みっつ side by side, and the dictation reveal says which one you just heard.
 - **The home screen stops asking for more once the day's session is done.** It now reads "Session du jour terminée" with a *Pratiquer encore* button, instead of showing a backlog of reviews that spaced repetition intends to roll over to tomorrow.
 - The daily portion is unchanged: about twelve characters, fourteen to fifteen screens.
 

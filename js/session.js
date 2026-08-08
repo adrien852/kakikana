@@ -129,8 +129,7 @@
       <div class="char-stage">
         ${ttsList.length
           ? `<div class="listen-row">${ttsList.map(r =>
-              `<button class="btn secondary small" data-speak="${r.r}">🔊 ${readingPill(r.t)}
-                <span class="jp">${r.r}</span><span class="ro">${r.ro}</span></button>`).join("")}</div>`
+              `<button class="btn secondary small" data-speak="${r.r}">🔊 ${readingPill(r.t)}</button>`).join("")}</div>`
           : `<button class="btn ${dictation ? "" : "secondary"} small" id="sess-speak" style="margin-bottom:10px">
               🔊 ${dictation ? t("replay") : t("listen")}</button>`}
         <div id="draw-container"></div>

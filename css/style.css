@@ -80,7 +80,6 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .listen-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
 .listen-row .btn { width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px; }
 .listen-row .pill { padding: 2px 7px; font-size: 11px; }
-.listen-row .ro { color: var(--ink-soft); font-size: 12px; }
 /* the reading + meaning, revealed only once the word has been said */
 .voice-panel .p-sub { font-size: 15px; color: var(--ink-soft); min-height: 22px; margin: -6px 0 8px; }
 .voice-panel .p-sub .jp { font-size: 18px; color: var(--ink); }
