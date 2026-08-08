@@ -38,6 +38,18 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.9.0
+
+- **Pronunciation now asks for the kanji's own reading, not one of its example words.** Practising 一 used to mean saying 一月 (*ichigatsu*) and practising 二 meant 二つ (*futatsu*) — two words that sound nothing alike and teach the compound rather than the character. The exercise now shows the bare kanji and asks you to read it: 山 → *yama*, 私 → *watashi*, 父 → *chichi*, 見 → *miru*.
+- **A badge says which reading is wanted** (音 ON or 訓 KUN). Where both readings are everyday words — 一 is *ichi* and *hitotsu*, and so are 六, 七 and 八 — the two alternate, and neither stops coming up until you have said each of them right a few times.
+- **The meaning appears once you have said it.** Nothing is given away beforehand; the reading, its romaji and the translation are revealed on success (and after the third miss, alongside the model being played).
+- **A reading only becomes an exercise if it is a real word on its own, of at least two syllables, and in everyday use.** That leaves 81 of the 104 kanji with a spoken exercise. 日, 手, 目, 木, 火, 本 and sixteen others are practised by writing and dictation only: *hi*, *te*, *me*, *ki*, *hon* are single syllables that no recogniser identifies reliably, and 男's ON reading *dan* or 社's KUN reading *yashiro* are almost never said alone.
+- **The writing prompt offers both readings, each labelled and with its romaji.** 三 used to play *mittsu* here and ask for *san* in dictation with nothing to explain the difference; now you can hear 音 ON さん and 訓 KUN みっつ side by side, and the dictation reveal says which one you just heard.
+- **The home screen stops asking for more once the day's session is done.** It now reads "Session du jour terminée" with a *Pratiquer encore* button, instead of showing a backlog of reviews that spaced repetition intends to roll over to tomorrow.
+- The daily portion is unchanged: about twelve characters, fourteen to fifteen screens.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.8.0
 
 - **Every practice is dealt in a fresh order.** Sessions used to follow the library order (gojūon for kana, frequency for kanji), so the same run always started the same way. The order is now shuffled each time you start, including the tie-break when several characters fall due at the same moment. What stays fixed is the curriculum itself: which characters get introduced is unchanged, only when they appear within the session varies.
@@ -112,10 +124,11 @@ To update your installed app: upload these files over the old ones in your GitHu
 ## Features
 
 - **Drawing practice** with real stroke validation (order, direction and shape), based on official stroke-order data. Help fades as you progress: model tracing → light guidance → drawing from memory. Hints appear only after a couple of failed attempts.
-- **Guided path**: hiragana first, katakana unlocks as you progress, kanji once the kana are solid. Never more than a handful of kanji in practice at once (configurable).
+- **Free tracks**: hiragana, katakana and kanji can each be practised on their own, or mixed in the daily session. Never more than a handful of kanji in practice at once (configurable, up to 10).
 - **Spaced repetition**: characters come back just before you'd forget them; mastered characters resurface periodically to stay solid.
-- **Pronunciation exercise**: automatic validation of your speech (online uses the device's recognizer — free, unlimited; offline works after downloading the optional ≈40 MB voice pack in Settings).
-- **Library**: kana in gojūon order with tap-to-hear; kanji sortable by difficulty, theme, or newest/oldest learned; each kanji has readings, meanings, character-origin explanations (pictograph, compound…), example words and sentences with audio. Mark kanji you already know.
+- **Pronunciation exercise**: read the kanji aloud with its own ON or KUN reading (labelled), or say a kana example word; validated automatically (online uses the device's recognizer — free, unlimited; offline works after downloading the optional ≈40 MB voice pack in Settings). It is practice only — a miss or a skip never affects your progress.
+- **Dictation**: once a character is solid, some encounters arrive audio-first — you hear the word and write the character without seeing it.
+- **Library**: kana in gojūon order with tap-to-hear; kanji sortable by difficulty, theme, or newest/oldest learned; each kanji has readings, meanings, character-origin explanations (pictograph, compound…), example words and sentences with audio, and a mic to try any of them. Mark the kanji you want to learn next.
 - **Exams** on mastered kanji only: writing, meaning and reading, no help, with history.
 - **French / English** interface. Translations are always from the Japanese.
 - **100% offline** after the first load; progress export/import.

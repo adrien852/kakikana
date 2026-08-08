@@ -16,6 +16,8 @@
     kanjiActive: [],  // kanji currently in practice
     kanjiWanted: [],  // kanji the user asked to learn next (jump the queue)
     kanjiOrder: [],   // chars in the order they entered practice/known
+    lastIntroDay: null,   // new characters are introduced once a day
+    lastSessionDay: null, // …and the day's session is only owed once
     exams: [],
     streak: { last: null, count: 0 }
   };
@@ -67,11 +69,68 @@
     if (!k || !k.ex || !k.ex.jp) return null;
     return morae(k.ex.jp) >= (min === undefined ? 2 : min) ? k.ex : null;
   }
-  // the longest of a kanji's example words, or null when none is long enough
-  function kanjiVoiceWord(k) {
-    if (!k || !k.w || !k.w.length) return null;
-    const best = k.w.slice().sort((a, b) => morae(b[1]) - morae(a[1]))[0];
-    return best && morae(best[1]) >= MIN_VOICE_MORAE ? best : null;
+
+  // ---- spoken readings ------------------------------------------------------
+  // A kanji is pronounced with its own reading, never with one of its example
+  // compounds: 一月 and 二つ sound nothing alike and teach the compound instead of
+  // the character. data/readings.js holds the readings that are worth saying —
+  // a word on its own, at least two syllables, in everyday use. Kanji with no
+  // such reading simply have no pronunciation exercise.
+  const VOICE_REPS = 3;              // successes before a reading stops being pushed
+
+  function kanjiReadings(ch) {
+    const r = window.READINGS && window.READINGS[ch];
+    return r && r.length ? r : [];
+  }
+  // every spelling accepted for a reading — the exercise grades the sound, so
+  // homophones written differently are correct too
+  function readingAccepts(rd) {
+    if (!rd) return [];
+    return [rd.r, rd.k, rd.ro].concat(rd.alt || []).filter(Boolean);
+  }
+  // Which reading to ask for. Both readings of a kanji are used equally until each
+  // has been said right a few times, then either may come up.
+  function pickReading(ch, excludeR) {
+    const all = kanjiReadings(ch).filter(r => r.r !== excludeR);
+    if (!all.length) return null;
+    if (all.length === 1) return all[0];
+    const rd = (S.chars[ch] && S.chars[ch].rd) || {};
+    const st = r => rd[r.r] || { t: 0, o: 0 };
+    const open = all.filter(r => st(r).o < VOICE_REPS);
+    const pool = open.length ? open : all;
+    let low = pool[0];
+    pool.forEach(r => {
+      if (st(r).o < st(low).o || (st(r).o === st(low).o && st(r).t < st(low).t)) low = r;
+    });
+    const tied = pool.filter(r => st(r).o === st(low).o && st(r).t === st(low).t);
+    return tied.length > 1 ? tied[Math.floor(Math.random() * tied.length)] : low;
+  }
+  const kata2hira = s => (s || "").replace(/[ァ-ヶ]/g,
+    c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  // is this reading of this kanji the ON or the KUN one? (used to label dictation)
+  function readingType(ch, r) {
+    const k = KANJI_MAP[ch];
+    if (!k || !r) return null;
+    const clean = s => kata2hira(s).replace(/[()（）]/g, "");
+    const inList = list => (list || []).some(x => clean(x[0]) === r);
+    if (inList(k.on)) return "on";
+    if (inList(k.kun)) return "kun";
+    return null;
+  }
+  // the two readings offered as text-to-speech on the writing prompt
+  function ttsReadings(ch) {
+    const k = KANJI_MAP[ch];
+    if (!k) return [];
+    const out = [];
+    const push = (list, type) => {
+      if (!list || !list.length) return;
+      const r = kata2hira(list[0][0]).replace(/[()（）]/g, "");
+      const ro = (list[0][1] || "").replace(/[()（）]/g, "");
+      if (r) out.push({ r, ro, t: type });
+    };
+    push(k.on, "on");
+    push(k.kun, "kun");
+    return out;
   }
 
   // ---- dictation ----------------------------------------------------------
@@ -150,11 +209,18 @@
 
   // Pronunciation is practice, never assessment: recognition is too unreliable for
   // a miss — or a skip — to cost anything. Nothing here touches stage, box, due
-  // dates or mastery; only a tally is kept.
-  function recordVoice(ch, ok) {
+  // dates or mastery; only a tally is kept. The per-reading tally decides which of
+  // a kanji's two readings comes up next, nothing more.
+  function recordVoice(ch, ok, reading) {
     const p = P(ch);
     p.voiceTry = (p.voiceTry || 0) + 1;
     if (ok) p.voiceOk = (p.voiceOk || 0) + 1;
+    if (reading) {
+      if (!p.rd) p.rd = {};
+      if (!p.rd[reading]) p.rd[reading] = { t: 0, o: 0 };
+      p.rd[reading].t++;
+      if (ok) p.rd[reading].o++;
+    }
     save();
   }
 
@@ -290,121 +356,135 @@
     return "kanji";
   }
 
+  // A session is a fixed daily portion, not "everything that happens to qualify":
+  //   · every kanji currently being learned, exactly once
+  //   · a fixed handful of kana (due reviews first, then new ones)
+  //   · a fixed handful of consolidations
+  // Whatever does not fit rolls over to the next day, which is what spaced
+  // repetition expects anyway.
+  const KANA_SLOTS = 5;              // in the mixed daily session
+  const KANA_SLOTS_FOCUSED = 8;      // when practising one syllabary on its own
+  const CONSOLIDATION_SLOTS = 3;
+  const CONSOLIDATION_SLOTS_KANJI = 4;
+
+  // New characters are introduced once a day: extra sessions are practice, not
+  // a way to race ahead through the syllabary.
+  function introductionsAllowed() { return S.lastIntroDay !== today(); }
+
   // track: "hiragana" | "katakana" | "kanji" | undefined (mixed)
   function buildSession(track) {
     const items = [];
+    const seen = {};
+    const add = (ch, tag) => {
+      if (seen[ch]) return false;
+      seen[ch] = true;
+      items.push({ type: "draw", ch, tag });
+      return true;
+    };
+
     const hira = HIRA_ALL.map(k => k.k).filter(c => window.STROKES[c]);
     const kata = KATA_ALL.map(k => k.k).filter(c => window.STROKES[c]);
     const allKanji = KANJI.map(k => k.k);
-    const pool =
+    const kanaPool =
       track === "hiragana" ? hira :
       track === "katakana" ? kata :
-      track === "kanji" ? allKanji :
-      hira.concat(kata, allKanji);
+      track === "kanji" ? [] : hira.concat(kata);
+    const pool = track === "kanji" ? allKanji : kanaPool.concat(track ? [] : allKanji);
 
-    // 1) due reviews from the chosen pool
-    // shuffled first, so characters that fall due together are not always taken
-    // in library order
-    let due = shuffle(dueChars(pool));
-    due.sort((a, b) => (S.chars[a].due - S.chars[b].due));
-    due.slice(0, 9).forEach(ch => items.push({ type: "draw", ch, tag: "review" }));
-
-    // 2) active kanji practice (kanji or mixed session)
+    // ---- 1. the kanji being learned: exactly one encounter each ----
+    let kanjiSlots = 0;
     if (!track || track === "kanji") {
       refillActiveKanji();
-      S.kanjiActive.forEach(ch => {
-        if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: P(ch).enc === 0 ? "new" : "review" });
+      S.kanjiActive.forEach(ch => { if (add(ch, P(ch).enc === 0 ? "new" : "review")) kanjiSlots++; });
+    }
+
+    // ---- 2. kana: due reviews first, then new characters, then a revisit ----
+    const kanaSlots = track === "kanji" ? 0 : (track ? KANA_SLOTS_FOCUSED : KANA_SLOTS);
+    if (kanaSlots) {
+      const dueKana = shuffle(dueChars(kanaPool)).sort((a, b) => S.chars[a].due - S.chars[b].due);
+      dueKana.forEach(ch => { if (countTag(items, "kana") < kanaSlots) add(ch, "review"); });
+
+      // introductions: only while few characters are still shaky, once a day
+      const inFlight = kanaPool.filter(ch => {
+        const p = S.chars[ch];
+        return p && p.enc > 0 && !p.mastered && !p.known && p.stage < 3;
+      }).length;
+      if (inFlight < MAX_IN_FLIGHT && introductionsAllowed()) {
+        // a new character costs two slots: it is introduced, then met again
+        while (countTag(items, "kana") + 1 < kanaSlots) {
+          const from = track || (currentTrack() === "katakana" ? "katakana" : "hiragana");
+          const next = nextNewKana(from, 1).concat(nextNewKana(from === "hiragana" ? "katakana" : "hiragana", 1));
+          const pick = next.find(c => !seen[c]);
+          if (!pick || !add(pick, "new")) break;
+        }
+      }
+      // still room: circle back to kana already learned, least recently practised
+      warmChars(kanaPool, kanaSlots).forEach(ch => { if (countTag(items, "kana") < kanaSlots) add(ch, "review"); });
+    }
+
+    // ---- 3. consolidation: due elsewhere, then mastered, then least recent ----
+    const CONSOLIDATION = track === "kanji" ? CONSOLIDATION_SLOTS_KANJI : CONSOLIDATION_SLOTS;
+    const before = items.length;
+    const slots = () => items.length - before;
+    shuffle(dueChars(pool)).sort((a, b) => S.chars[a].due - S.chars[b].due)
+      .forEach(ch => { if (slots() < CONSOLIDATION) add(ch, "review"); });
+    dueMastered(pool, CONSOLIDATION)
+      .forEach(ch => { if (slots() < CONSOLIDATION) add(ch, "mastered"); });
+    warmChars(pool, CONSOLIDATION)
+      .forEach(ch => { if (slots() < CONSOLIDATION) add(ch, "review"); });
+    if (slots() < CONSOLIDATION) {
+      const learned = shuffle(pool.filter(ch => S.chars[ch] && S.chars[ch].enc > 0));
+      learned.forEach(ch => {
+        if (slots() < CONSOLIDATION) add(ch, S.chars[ch].mastered || S.chars[ch].known ? "mastered" : "review");
       });
     }
 
-    // 3) new character intros — but only while few characters are still shaky,
-    // so a track is not "covered once" in a single sweep and then forgotten.
-    const inFlight = (track === "hiragana" ? hira : track === "katakana" ? kata : hira.concat(kata))
-      .filter(ch => { const p = S.chars[ch]; return p && p.enc > 0 && !p.mastered && !p.known && p.stage < 3; }).length;
-    const roomForNew = inFlight < MAX_IN_FLIGHT;
-
-    if (track === "hiragana" || track === "katakana") {
-      const room = Math.max(0, 10 - items.length);
-      const n = roomForNew ? Math.min(3, Math.max(1, room)) : 0;
-      if (n) nextNewKana(track, n).forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
-    } else if (!track) {
-      // mixed: follow the suggested focus, interleaving syllabaries so neither stalls
-      const focus = currentTrack();
-      if (focus !== "kanji" && roomForNew) {
-        const room = Math.max(0, 10 - items.length);
-        const n = Math.min(3, Math.max(1, room));
-        const other = focus === "hiragana" ? "katakana" : "hiragana";
-        let picks = nextNewKana(focus, Math.max(1, n - 1));
-        if (picks.length < n) {
-          nextNewKana(other, n - picks.length).forEach(c => { if (!picks.includes(c)) picks.push(c); });
-        }
-        picks.forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
-      } else {
-        const leftovers = nextNewKana("hiragana", 1).concat(nextNewKana("katakana", 1));
-        leftovers.slice(0, 1).forEach(ch => items.push({ type: "draw", ch, tag: "new" }));
-      }
+    // a brand-new learner with nothing at all yet
+    if (!items.length && track !== "kanji") {
+      nextNewKana(track || "hiragana", 3).forEach(ch => add(ch, "new"));
     }
 
-    // 4) mastered consolidation (1-2) from the chosen pool
-    dueMastered(pool, 2).forEach(ch => {
-      if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: "mastered" });
-    });
-
-    // 4b) come back to characters already at a higher stage, even if not due yet:
-    // a track should keep circling back instead of being seen once and left.
-    warmChars(pool, 3).forEach(ch => {
-      if (!items.find(i => i.ch === ch)) items.push({ type: "draw", ch, tag: "review" });
-    });
-
-    // 5) voice items on well-known chars
+    // ---- 4. one pronunciation item, on a kana word that is worth attempting ----
     if (S.settings.voiceOn && window.Voice && window.Voice.anyEngineMaybe()) {
       const cands = items
         .filter(i => i.type === "draw" && charType(i.ch) !== "kanji" && P(i.ch).stage >= 2 &&
                      kanaVoiceWord(i.ch, MIN_VOICE_MORAE))
         .map(i => i.ch);
-      shuffle(cands).slice(0, 2).forEach(ch => items.push({ type: "voice", ch }));
-    }
-
-    // cap the session length, keep at least something
-    let list = items.slice(0, MAX_ITEMS);
-    if (!list.length) {
-      // nothing due: consolidate random learned chars from the pool
-      const learned = pool.filter(ch => S.chars[ch] && S.chars[ch].enc > 0);
-      shuffle(learned).slice(0, 8).forEach(ch => list.push({ type: "draw", ch, tag: "review" }));
-      if (!list.length && track !== "kanji") {
-        nextNewKana(track || "hiragana", 3).forEach(ch => list.push({ type: "draw", ch, tag: "new" }));
-      }
-    }
-    // 6) top the session up with characters already learned, least recently seen
-    // first — this is what keeps the whole set circulating instead of each
-    // character being met once and left behind.
-    if (list.length < MIN_ITEMS) {
-      const have = {}; list.forEach(i => have[i.ch] = true);
-      const extras = pool.filter(ch => {
-        const p = S.chars[ch];
-        return p && p.enc > 0 && !have[ch];
-      });
-      shuffle(extras).sort((a, b) => {
-        const pa = S.chars[a], pb = S.chars[b];
-        // prefer the least recently practised, then the least solid
-        return (pa.lastSeen || 0) - (pb.lastSeen || 0) || pa.stage - pb.stage;
-      });
-      for (const ch of extras) {
-        if (list.length >= MIN_ITEMS) break;
-        list.push({ type: "draw", ch, tag: S.chars[ch].mastered || S.chars[ch].known ? "mastered" : "review" });
-        have[ch] = true;
-      }
+      shuffle(cands).slice(0, 1).forEach(ch => items.push({ type: "voice", ch }));
     }
 
     // decide which encounters arrive as dictation (audio-first)
-    list.forEach(it => { if (it.type === "draw" && it.tag !== "new" && dictationMode(it.ch)) it.mode = "dictation"; });
-    return arrange(list);
+    items.forEach(it => {
+      if (it.type === "draw" && it.tag !== "new" && dictationMode(it.ch)) it.mode = "dictation";
+    });
+    return arrange(items);
   }
 
-  // Deal the session out in a fresh order every time. Constraints kept:
-  //  · a character never appears twice in a row
-  //  · a newly introduced character is met again later in the same session
-  //  · a pronunciation item comes after the character has been written
+  // how many kana items the session holds so far (new characters count double,
+  // because each is met again later in the same session)
+  function countTag(items, kind) {
+    let n = 0;
+    items.forEach(i => {
+      if (i.type !== "draw" || charType(i.ch) === "kanji") return;
+      n += i.tag === "new" ? 2 : 1;
+    });
+    return n;
+  }
+
+  // the first session of the day is the one that introduces new characters;
+  // any further session that day is practice on what is already started
+  function noteSessionStarted() {
+    if (S.lastIntroDay !== today()) { S.lastIntroDay = today(); save(); }
+  }
+
+  // The day's portion has been done. Whatever is still "due" rolls over to
+  // tomorrow, which is how spaced repetition is meant to work — so the home
+  // screen stops asking for more today instead of showing a backlog.
+  function noteSessionDone() {
+    if (S.lastSessionDay !== today()) { S.lastSessionDay = today(); save(); }
+  }
+  function sessionDoneToday() { return S.lastSessionDay === today(); }
+
   function arrange(items) {
     const fresh = shuffle(items.filter(i => i.type === "draw" && i.tag === "new"));
     const rest = shuffle(items.filter(i => i.type === "draw" && i.tag !== "new" && i.tag !== "reinforce"));
@@ -433,8 +513,10 @@
       out.splice(pos, 0, item);
     };
 
-    // every newly introduced character is met a second time later in the session
-    fresh.forEach(n => insertAfter(n.ch, { type: "draw", ch: n.ch, tag: "reinforce" }, 3));
+    // a newly introduced kana is met a second time later in the session; a kanji
+    // is not — one encounter per kanji being learned, writing plus pronunciation
+    fresh.filter(n => charType(n.ch) !== "kanji")
+      .forEach(n => insertAfter(n.ch, { type: "draw", ch: n.ch, tag: "reinforce" }, 3));
     // and a pronunciation item only after that character has been written — if
     // that character sits right at the end, pull it forward to make room
     voice.forEach(v => {
@@ -501,9 +583,11 @@
     save, P, status, charType,
     KANJI, KANJI_MAP, KANA_MAP, HIRA_BASE, HIRA_ALL, KATA_BASE, KATA_ALL,
     recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
-    dictationInfo, dictationMode, kanaVoiceWord, kanjiVoiceWord,
+    dictationInfo, dictationMode, kanaVoiceWord,
+    kanjiReadings, readingAccepts, pickReading, readingType, ttsReadings,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
-    buildSession, trackStats, masteredKanji, totalDue, bumpStreak,
+    buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
+    trackStats, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll
   };
 })();

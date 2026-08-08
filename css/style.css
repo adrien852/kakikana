@@ -74,6 +74,16 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .pill.dictation { background: #e4e0f5; color: #5b4b9e; }
 .pill.hira { background: #f7ddd8; color: #8f2b20; }
 .pill.kata { background: #d9ecff; color: #2b5570; }
+.pill.onyomi { background: #dfe8d6; color: #4a6234; }
+.pill.kunyomi { background: #fbe3cf; color: #8a5220; }
+/* the two readings of a kanji, offered side by side on the writing prompt */
+.listen-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+.listen-row .btn { width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.listen-row .pill { padding: 2px 7px; font-size: 11px; }
+.listen-row .ro { color: var(--ink-soft); font-size: 12px; }
+/* the reading + meaning, revealed only once the word has been said */
+.voice-panel .p-sub { font-size: 15px; color: var(--ink-soft); min-height: 22px; margin: -6px 0 8px; }
+.voice-panel .p-sub .jp { font-size: 18px; color: var(--ink); }
 /* ---- session ---- */
 .session-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .session-top .pbar { flex: 1; margin-top: 0; }

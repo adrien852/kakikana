@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.8.0";
+  window.APP_VERSION = "1.9.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -35,6 +35,9 @@
     const ks = Engine.trackStats("katakana");
     const js = Engine.trackStats("kanji");
     const due = Engine.totalDue();
+    // once the day's portion is done, what is left rolls over to tomorrow —
+    // the home screen says so instead of showing a backlog that never empties
+    const done = Engine.sessionDoneToday();
     const streak = Engine.state.streak.count;
     const active = Engine.state.kanjiActive;
 
@@ -56,9 +59,10 @@
     v.innerHTML = `
       <h1>${t("appName")} <span style="font-size:14px;font-weight:400" class="muted">${streak > 1 ? "🔥 " + streak + " " + t("streak") : ""}</span></h1>
       <div class="card" style="background:linear-gradient(135deg,#b7392b,#8f2b20);color:#fff">
-        <div style="font-size:15px;font-weight:600;margin-bottom:4px">${due > 0 ? due + " " + t("due_reviews") : t("no_due")}</div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px">${
+          done ? "✓ " + t("done_today") : due > 0 ? due + " " + t("due_reviews") : t("no_due")}</div>
         ${active.length ? `<div style="font-size:26px;margin-bottom:10px" class="jp">${active.join("　")}</div>` : ""}
-        <button class="btn" style="background:#fff;color:#b7392b" id="btn-session">▶ ${t("start_session")}</button>
+        <button class="btn" style="background:#fff;color:#b7392b" id="btn-session">▶ ${done ? t("practice_more") : t("start_session")}</button>
       </div>
       <p class="muted" style="font-size:12.5px;margin:2px 2px 10px">${t("tap_track")}</p>
       ${trackCard("hiragana", "h", "あ", t("hiragana"), hs)}

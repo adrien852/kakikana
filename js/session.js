@@ -4,6 +4,7 @@
   let current = null; // mounted drawing
   let advancing = false;
   let live = false;       // a session is on screen (guards queued timers)
+  let screen = 0, totalScreens = 0;
   let curTrack = null; // null = mixed, or "hiragana"|"katakana"|"kanji"
 
   function t(key) { return window.App.t(key); }
@@ -13,10 +14,30 @@
     live = true;
     curTrack = track || null;
     items = Engine.buildSession(curTrack);
-    idx = 0; score = { ok: 0, total: 0 };
+    Engine.noteSessionStarted();
+    idx = 0; screen = 0; score = { ok: 0, total: 0 };
+    // a kanji drawing is followed by its pronunciation, so it is two screens
+    totalScreens = items.reduce((n, it) => n + 1 + (extraScreen(it) ? 1 : 0), 0);
     Engine.bumpStreak();
     next();
   }
+
+  // does this item carry a pronunciation step after the drawing?
+  // (a reading that was just played as the dictation prompt is not worth asking for)
+  function voiceReading(it, live) {
+    if (it.type !== "draw" || Engine.charType(it.ch) !== "kanji") return null;
+    if (!Engine.state.settings.voiceOn) return null;
+    if (!window.Voice) return null;
+    if (!(live ? Voice.engineNow() : Voice.anyEngineMaybe())) return null;
+    let skip = null;
+    if (it.mode === "dictation") {
+      const d = Engine.dictationInfo(it.ch);
+      if (d) skip = d.r;
+    }
+    return live ? Engine.pickReading(it.ch, skip)
+                : (Engine.kanjiReadings(it.ch).filter(r => r.r !== skip)[0] || null);
+  }
+  function extraScreen(it) { return !!voiceReading(it, false); }
 
   function next() {
     advancing = false;
@@ -29,11 +50,12 @@
   }
 
   function header(extra) {
-    const pct = Math.round(100 * idx / items.length);
+    const total = Math.max(totalScreens, screen);
+    const pct = Math.round(100 * (screen - 1) / Math.max(1, total));
     return `<div class="session-top">
       <button class="xbtn" id="sess-quit">✕</button>
       <div class="pbar"><div style="width:${pct}%"></div></div>
-      <span class="muted">${idx + 1}/${items.length}</span>
+      <span class="muted">${screen}/${total}</span>
     </div>${extra || ""}`;
   }
 
@@ -50,8 +72,15 @@
     return "";
   }
 
+  // 三 is さん and みっつ: every reading on screen says which one it is
+  function readingPill(kind) {
+    if (kind !== "on" && kind !== "kun") return "";
+    return `<span class="pill ${kind === "on" ? "onyomi" : "kunyomi"}">${t(kind === "on" ? "badge_on" : "badge_kun")}</span>`;
+  }
+
   // ---------- drawing item ----------
   function renderDraw(it) {
+    screen++;
     const ch = it.ch;
     const p = Engine.P(ch);
     const stage = it.tag === "reinforce" ? Math.max(p.stage, 1) : p.stage;
@@ -65,6 +94,10 @@
     // how much of the guide is still shown at this stage
     const plan = Drawing.hintPlan(ch, stage, { dictation: !!dictation });
 
+    // a kanji has two readings and playing one of them unannounced is what made
+    // 三 sound like さん here and みっつ there: offer both, each labelled
+    const ttsList = (!dictation && type === "kanji") ? Engine.ttsReadings(ch) : [];
+
     let promptMain, promptSub = "", speakText = null;
     if (dictation) {
       promptMain = t("dictation_prompt");
@@ -73,9 +106,10 @@
     } else if (type === "kanji") {
       const lang = Engine.state.lang;
       promptMain = `${t("draw_meaning_hint")} <b>« ${lang === "fr" ? kanji.fr : kanji.en} »</b>`;
-      const rd = (kanji.kun[0] || kanji.on[0]);
-      speakText = rd ? rd[0].replace(/[()（）]/g, "") : ch;
-      if (stage <= 1) promptSub = rd ? `${rd[0]} — ${rd[1]}` : "";
+      const pref = ttsList.find(r => r.t === "kun") || ttsList[0];
+      speakText = pref ? pref.r : ch;
+      // the readings live on the two buttons below, romaji and all — no need to
+      // repeat one of them here without saying which one it is
     } else {
       const r = kana ? kana.r : "";
       promptMain = `<span class="p-big">${r}</span>`;
@@ -93,8 +127,12 @@
         <div class="p-sub">${promptSub}</div>
       </div>
       <div class="char-stage">
-        <button class="btn ${dictation ? "" : "secondary"} small" id="sess-speak" style="margin-bottom:10px">
-          🔊 ${dictation ? t("replay") : t("listen")}</button>
+        ${ttsList.length
+          ? `<div class="listen-row">${ttsList.map(r =>
+              `<button class="btn secondary small" data-speak="${r.r}">🔊 ${readingPill(r.t)}
+                <span class="jp">${r.r}</span><span class="ro">${r.ro}</span></button>`).join("")}</div>`
+          : `<button class="btn ${dictation ? "" : "secondary"} small" id="sess-speak" style="margin-bottom:10px">
+              🔊 ${dictation ? t("replay") : t("listen")}</button>`}
         <div id="draw-container"></div>
         <div class="stroke-count" id="stroke-count">${dictation ? "" :
           plan.total + " " + t("strokes_n") + (plan.shown > 0 && plan.shown < plan.total
@@ -107,7 +145,10 @@
       </div>`);
 
     document.getElementById("sess-quit").onclick = quit;
-    document.getElementById("sess-speak").onclick = () => Voice.speak(speakText);
+    const speakBtn = document.getElementById("sess-speak");
+    if (speakBtn) speakBtn.onclick = () => Voice.speak(speakText);
+    v.querySelectorAll("[data-speak]").forEach(b =>
+      b.onclick = () => Voice.speak(b.dataset.speak));
     document.getElementById("sess-skip").onclick = () => {
       sfx("tap");
       Engine.recordDraw(ch, false, false);
@@ -145,13 +186,10 @@
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
         // kanji: writing and pronunciation are two halves of the same encounter
-        const voiceWord = type === "kanji" ? Engine.kanjiVoiceWord(kanji) : null;
-        let speakPhase = !!voiceWord && Engine.state.settings.voiceOn && Voice.engineNow();
-        // after a dictation, asking for the very word just played adds nothing
-        if (speakPhase && dictation && voiceWord[1] === dictation.r) speakPhase = false;
+        const reading = voiceReading(it, true);
         setTimeout(() => {
           if (!advancing || !live) return;
-          if (speakPhase) renderVoice({ ch, type: "voice" }, true);
+          if (reading) renderVoice({ ch, type: "voice", reading }, true);
           else { idx++; next(); }
         }, 1300);
       }
@@ -162,8 +200,10 @@
       if (!box) return;
       // for kana the romaji is already shown, so only kanji add a meaning
       const meaning = type === "kanji" ? (Engine.state.lang === "fr" ? kanji.fr : kanji.en) : "";
+      // which of the two readings was just dictated — 三 is さん here and みっつ elsewhere
+      const kind = type === "kanji" ? Engine.readingType(ch, dictation.r) : null;
       box.innerHTML = `<div class="p-big jp">${ch}</div>
-        <div class="p-sub"><b>${dictation.r}</b> · ${dictation.ro}${meaning ? " — " + meaning : ""}</div>`;
+        <div class="p-sub">${readingPill(kind)} <b>${dictation.r}</b> · ${dictation.ro}${meaning ? " — " + meaning : ""}</div>`;
     }
 
     document.getElementById("sess-hint").onclick = () => {
@@ -188,22 +228,23 @@
 
   // ---------- voice item (also phase 2 of every kanji encounter) ----------
   function renderVoice(it, isSecondPhase) {
+    screen++;
     const ch = it.ch;
     const type = Engine.charType(ch);
     const kana = Engine.KANA_MAP[ch];
     const kanji = Engine.KANJI_MAP[ch];
 
-    // for kanji: pronounce its first example word; for kana: syllable or its example word
-    let target, display, accepts;
+    // A kanji is asked for by its own reading, shown as the bare character plus a
+    // badge saying which reading is wanted; a kana by one of its example words.
+    let target, display, accepts, reading = null;
     if (type === "kanji") {
-      // the longest example word: short ones are not reliably recognised
-      const w = Engine.kanjiVoiceWord(kanji);
-      if (!w) { idx++; return next(); }
-      target = w[1]; display = w[0];
-      accepts = [w[0], w[1], w[2]];
+      reading = it.reading || Engine.pickReading(ch);
+      if (!reading) { screen--; idx++; return next(); }
+      target = reading.r; display = ch;
+      accepts = Engine.readingAccepts(reading);
     } else {
       const ex = Engine.kanaVoiceWord(ch, 3);
-      if (!ex) { idx++; return next(); }
+      if (!ex) { screen--; idx++; return next(); }
       target = ex.jp; display = ex.jp;
       accepts = [ex.jp, ex.r];
     }
@@ -217,9 +258,11 @@
             <span class="phase done">1. ${t("phase_write")} ✓</span>
             <span class="phase active">2. ${t("phase_say")}</span>
           </div>` : ""}
-        <div class="p-main mt16">${t("say_prompt")}</div>
+        <div class="p-main mt16">${reading ? t("say_reading_prompt") : t("say_prompt")}</div>
         <div class="muted" style="font-size:12.5px">${t("voice_no_penalty")}</div>
+        ${reading ? `<div class="mt8">${readingPill(reading.t)}</div>` : ""}
         <div class="voice-char jp">${display}</div>
+        <div class="p-sub" id="v-answer"></div>
         <button class="btn secondary small" id="v-listen">🔊 ${t("listen")}</button>
         <button class="mic-btn" id="v-mic">🎤</button>
         <div class="muted" id="v-status">${t("mic_start")}</div>
@@ -261,6 +304,14 @@
     }
     listenBtn.onclick = () => { if (!Voice.isListening()) Voice.speak(target); };
 
+    // what was being asked for, spelled out — only once it has been said right
+    function revealAnswer() {
+      const el = document.getElementById("v-answer");
+      if (!el || !reading) return;
+      const meaning = Engine.state.lang === "fr" ? reading.fr : reading.en;
+      el.innerHTML = `<b class="jp">${reading.r}</b> · ${reading.ro}${meaning ? " — " + meaning : ""}`;
+    }
+
     if (!Voice.engineNow()) {
       status.textContent = t("voice_unavailable");
       mic.disabled = true; mic.style.opacity = .4;
@@ -295,15 +346,17 @@
           lockPanel();
           sfx("right");
           flash(t("voice_correct"), "good");
-          Engine.recordVoice(ch, true);
-          setTimeout(() => { if (live) { idx++; next(); } }, 1200);
+          revealAnswer();
+          Engine.recordVoice(ch, true, reading && reading.r);
+          setTimeout(() => { if (live) { idx++; next(); } }, 2000);
         } else if (attempts >= 3) {
           lockPanel();
           sfx("bad");
           flash(t("voice_close"), "bad");
-          Engine.recordVoice(ch, false);
+          revealAnswer();
+          Engine.recordVoice(ch, false, reading && reading.r);
           Voice.speak(target);
-          setTimeout(() => { if (live) { idx++; next(); } }, 2200);
+          setTimeout(() => { if (live) { idx++; next(); } }, 2600);
         } else {
           sfx("miss");
           flash(t("voice_retry"), "bad");
@@ -318,6 +371,7 @@
 
   function finish() {
     live = false;
+    Engine.noteSessionDone();
     sfx("fanfare");
     const v = document.getElementById("view");
     const pct = score.total ? Math.round(100 * score.ok / score.total) : 100;
