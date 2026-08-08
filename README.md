@@ -38,6 +38,13 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.8.0
+
+- **Every practice is dealt in a fresh order.** Sessions used to follow the library order (gojūon for kana, frequency for kanji), so the same run always started the same way. The order is now shuffled each time you start, including the tie-break when several characters fall due at the same moment. What stays fixed is the curriculum itself: which characters get introduced is unchanged, only when they appear within the session varies.
+- Three rules are still guaranteed: a character never appears twice in a row, a newly introduced character is always met again later in the same session, and a pronunciation item always comes after you have written that character.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.7.0
 
 - **The stroke guide now fades away gradually** instead of switching off. Each time a character advances a stage, the outline recedes from the end: all strokes, then all but the last, then fewer still, then none — so you always recall the ending first and work backwards.

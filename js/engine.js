@@ -271,7 +271,7 @@
       const p = S.chars[ch];
       return p && p.enc > 0 && !p.mastered && !p.known && p.stage >= 2 && p.due > now;
     });
-    w.sort((a, b) => (S.chars[a].lastSeen || 0) - (S.chars[b].lastSeen || 0));
+    shuffle(w).sort((a, b) => (S.chars[a].lastSeen || 0) - (S.chars[b].lastSeen || 0));
     return w.slice(0, n);
   }
 
@@ -303,7 +303,9 @@
       hira.concat(kata, allKanji);
 
     // 1) due reviews from the chosen pool
-    let due = dueChars(pool);
+    // shuffled first, so characters that fall due together are not always taken
+    // in library order
+    let due = shuffle(dueChars(pool));
     due.sort((a, b) => (S.chars[a].due - S.chars[b].due));
     due.slice(0, 9).forEach(ch => items.push({ type: "draw", ch, tag: "review" }));
 
@@ -382,7 +384,7 @@
         const p = S.chars[ch];
         return p && p.enc > 0 && !have[ch];
       });
-      extras.sort((a, b) => {
+      shuffle(extras).sort((a, b) => {
         const pa = S.chars[a], pb = S.chars[b];
         // prefer the least recently practised, then the least solid
         return (pa.lastSeen || 0) - (pb.lastSeen || 0) || pa.stage - pb.stage;
@@ -396,22 +398,53 @@
 
     // decide which encounters arrive as dictation (audio-first)
     list.forEach(it => { if (it.type === "draw" && it.tag !== "new" && dictationMode(it.ch)) it.mode = "dictation"; });
-    // interleave: new items spread out
-    return interleave(list);
+    return arrange(list);
   }
 
-  function interleave(items) {
-    const news = items.filter(i => i.tag === "new");
-    const rest = items.filter(i => i.tag !== "new");
-    const out = [];
-    let ni = 0, ri = 0;
-    const gap = Math.max(1, Math.floor(rest.length / (news.length + 1)));
-    while (ri < rest.length || ni < news.length) {
-      for (let g = 0; g < gap && ri < rest.length; g++) out.push(rest[ri++]);
-      if (ni < news.length) out.push(news[ni++]);
-    }
-    // each new char: add one extra rep at the end of the session
-    news.forEach(n => out.push({ type: "draw", ch: n.ch, tag: "reinforce" }));
+  // Deal the session out in a fresh order every time. Constraints kept:
+  //  · a character never appears twice in a row
+  //  · a newly introduced character is met again later in the same session
+  //  · a pronunciation item comes after the character has been written
+  function arrange(items) {
+    const fresh = shuffle(items.filter(i => i.type === "draw" && i.tag === "new"));
+    const rest = shuffle(items.filter(i => i.type === "draw" && i.tag !== "new" && i.tag !== "reinforce"));
+    const voice = items.filter(i => i.type === "voice");
+    const out = rest.slice();
+
+    // a new character goes in the earlier part of the session, so there is always
+    // room to meet it again afterwards
+    fresh.forEach(n => {
+      const limit = Math.max(1, Math.floor(out.length * 0.7));
+      out.splice(Math.floor(Math.random() * (limit + 1)), 0, n);
+    });
+
+    // place an item somewhere after its character's first appearance, but never
+    // right beside another encounter of the same character
+    const insertAfter = (ch, item, gap) => {
+      const first = out.findIndex(x => x.ch === ch);
+      const from = Math.min(out.length, first < 0 ? 0 : first + gap);
+      const spots = [];
+      for (let p = from; p <= out.length; p++) {
+        if (p > 0 && out[p - 1].ch === ch) continue;
+        if (p < out.length && out[p].ch === ch) continue;
+        spots.push(p);
+      }
+      const pos = spots.length ? spots[Math.floor(Math.random() * spots.length)] : out.length;
+      out.splice(pos, 0, item);
+    };
+
+    // every newly introduced character is met a second time later in the session
+    fresh.forEach(n => insertAfter(n.ch, { type: "draw", ch: n.ch, tag: "reinforce" }, 3));
+    // and a pronunciation item only after that character has been written — if
+    // that character sits right at the end, pull it forward to make room
+    voice.forEach(v => {
+      const at = out.findIndex(x => x.ch === v.ch);
+      if (at >= 0 && at >= out.length - 2) {
+        const item = out.splice(at, 1)[0];
+        out.splice(Math.floor(Math.random() * Math.max(1, out.length - 2)), 0, item);
+      }
+      insertAfter(v.ch, v, 2);
+    });
     return out;
   }
 
