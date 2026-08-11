@@ -224,6 +224,53 @@
     save();
   }
 
+  // ---- how far a character is from being mastered -------------------------
+  // Mastery has two conditions and both must be met: enough unaided successes,
+  // spread over enough distinct days. Reporting one number would hide the fact
+  // that the second one cannot be rushed — a day only ever counts once.
+  function masteryProgress(ch) {
+    const p = S.chars[ch];
+    const st = S.settings;
+    const reps = p ? (p.unaided || 0) : 0;
+    const days = p ? (p.days || []).length : 0;
+    const repsNeed = st.masteryReps, daysNeed = st.minDays;
+    return {
+      reps, repsNeed, days, daysNeed,
+      started: !!(p && p.enc > 0),
+      done: !!(p && (p.mastered || p.known)),
+      // both conditions have to land, so overall progress is the weaker of the two
+      pct: Math.round(100 * Math.min(1, Math.min(reps / repsNeed, days / daysNeed))),
+      // a day is only credited by an unaided success, and only once
+      creditedToday: !!(p && (p.days || []).includes(today()))
+    };
+  }
+
+  // ---- the day's ceiling --------------------------------------------------
+  // Since a character can earn at most one day of credit per calendar day,
+  // practising everything currently being learned once is the most progress the
+  // day can hold. This reports how much of that ceiling is left.
+  function studying(pool) {
+    return pool.filter(ch => {
+      const p = S.chars[ch];
+      return p && p.enc > 0 && !p.mastered && !p.known;
+    });
+  }
+  function dailyProgress(which) {
+    let list;
+    if (which === "hiragana") list = HIRA_ALL.map(k => k.k);
+    else if (which === "katakana") list = KATA_ALL.map(k => k.k);
+    else if (which === "kanji") list = KANJI.map(k => k.k);
+    else list = HIRA_ALL.concat(KATA_ALL).map(k => k.k).concat(KANJI.map(k => k.k));
+    const inProgress = studying(list);
+    const d = today();
+    const seen = inProgress.filter(ch => {
+      const p = S.chars[ch];
+      return p.lastSeen && new Date(p.lastSeen).toISOString().slice(0, 10) === d;
+    });
+    return { studying: inProgress.length, seenToday: seen.length,
+             left: inProgress.length - seen.length };
+  }
+
   function checkMastery(ch) {
     const p = P(ch);
     const st = S.settings;
@@ -587,7 +634,7 @@
     kanjiReadings, readingAccepts, pickReading, readingType, ttsReadings,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
-    trackStats, masteredKanji, totalDue, bumpStreak,
+    trackStats, masteryProgress, dailyProgress, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll
   };
 })();

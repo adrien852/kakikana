@@ -14,6 +14,31 @@
     return `<button class="mic-mini ${extraClass || ""}" data-mic="${encodeURIComponent(JSON.stringify(accepts))}" title="${t("practice_say")}">🎤</button>`;
   }
 
+  // ---------- how far this character is from mastery ----------
+  // Two bars, because there are two conditions and only one of them can be
+  // hurried: the days are calendar days, so they arrive at one a day at best.
+  function masteryHtml(ch) {
+    const m = Engine.masteryProgress(ch);
+    if (!m.started || m.done) return "";
+    const bar = (n, need) => `<div class="mbar"><div style="width:${Math.min(100, Math.round(100 * n / need))}%"></div></div>`;
+    return `<div class="kv"><div class="k">${t("to_mastery")}</div><div class="v">
+      <div class="mrow">${bar(m.reps, m.repsNeed)}<span>${Math.min(m.reps, m.repsNeed)}/${m.repsNeed} ${t("mastery_reps")}</span></div>
+      <div class="mrow">${bar(m.days, m.daysNeed)}<span>${Math.min(m.days, m.daysNeed)}/${m.daysNeed} ${t("mastery_days")}</span></div>
+      ${(() => {
+        // only worth saying while the days are still the binding condition
+        if (m.creditedToday) return `<div class="muted" style="font-size:12px;margin-top:4px">✓ ${t("mastery_day_done")}</div>`;
+        if (m.days < m.daysNeed) return `<div class="muted" style="font-size:12px;margin-top:4px">${t("mastery_day_open")}</div>`;
+        return "";
+      })()}
+    </div></div>`;
+  }
+  // the same figure as a hairline under the character in the grid
+  function cellBar(ch) {
+    const m = Engine.masteryProgress(ch);
+    if (!m.started || m.done) return "";
+    return `<span class="cell-bar"><i style="width:${m.pct}%"></i></span>`;
+  }
+
   function lockSpeakers(on) {
     document.querySelectorAll("[data-say]").forEach(b => {
       b.disabled = on; b.classList.toggle("is-disabled", on);
@@ -120,7 +145,7 @@
 
   function cellKana(k) {
     const st = Engine.status(k.k);
-    return `<div class="cell ${st}" data-k="${k.k}"><span class="dot"></span><span class="g jp">${k.k}</span><span class="r">${k.r}</span></div>`;
+    return `<div class="cell ${st}" data-k="${k.k}"><span class="dot"></span><span class="g jp">${k.k}</span><span class="r">${k.r}</span>${cellBar(k.k)}</div>`;
   }
 
   function openKana(ch, sy) {
@@ -152,7 +177,8 @@
       </div>
       <div class="muted" style="font-size:12.5px;margin-top:8px">${canPractise && Voice.anyEngineMaybe() ? t("practice_hint_word") : ""}</div>
       ${originHtml}${exHtml}
-      ${p ? `<div class="kv"><div class="k">${t("progress")}</div><div class="v">${p.succ || 0} ✓ · ${p.fail || 0} ✗ · ${p.unaided || 0} ${t("stats_mastered")}</div></div>` : ""}
+      ${p ? `<div class="kv"><div class="k">${t("progress")}</div><div class="v">${p.succ || 0} ✓ · ${p.fail || 0} ✗</div></div>` : ""}
+      ${masteryHtml(ch)}
       ${st !== "mastered" ? `<button class="btn secondary mt8" id="d-known">${t("mark_known")}</button>`
         : (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "")}
     `, () => { if (animWriter) animWriter = null; });
@@ -201,6 +227,7 @@
           ${active ? `<span class="cell-tag">✏️</span>` : wanted ? `<span class="cell-tag">★</span>` : ""}
           <span class="g jp" style="font-size:30px">${k.k}</span>
           <span class="r">${Engine.state.lang === "fr" ? k.fr.split(";")[0] : k.en.split(";")[0]}</span>
+          ${cellBar(k.k)}
         </div>`;
       }).join("") + `</div>`;
     });
@@ -259,6 +286,7 @@
       <div class="kv"><div class="k">${t("examples")}</div>${words}</div>
       <div class="kv"><div class="k">${t("sentence")}</div>${sentence}</div>
       <div class="kv"><div class="k">${t("learned_on")}</div><div class="v">${learnedOn}</div></div>
+      ${masteryHtml(ch)}
       ${st === "mastered" ? (p && p.known ? `<button class="btn ghost mt8" id="d-known-un">${t("unmark_known")}</button>` : "") : active
         ? `<div class="hint-banner">${t("already_learning")}</div>${wanted ? `<button class="btn ghost" id="d-want-un">${t("unwant_learn")}</button>` : ""}`
         : wanted

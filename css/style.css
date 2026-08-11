@@ -80,6 +80,34 @@ h2 { font-size: 17px; margin: 20px 0 10px; }
 .listen-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
 .listen-row .btn { width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px; }
 .listen-row .pill { padding: 2px 7px; font-size: 11px; }
+/* how much of today's possible progress is left in a track */
+.day-line { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.day-line.full { color: var(--green); font-weight: 700; }
+/* ---- progress towards mastery ---- */
+.mrow { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 13px; }
+.mbar { flex: 0 0 76px; height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.mbar > div { height: 100%; background: var(--green); border-radius: 4px; transition: width .4s; }
+.cell-bar {
+  position: absolute; left: 10%; right: 10%; bottom: 5px; height: 3px;
+  background: var(--line); border-radius: 2px; overflow: hidden;
+}
+.cell-bar > i { display: block; height: 100%; background: var(--green); border-radius: 2px; }
+/* a character just reached mastery */
+.toast-master {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 60; pointer-events: none;
+  background: rgba(43,38,32,.35); animation: masterIn .35s ease-out;
+}
+.toast-master .tm-card {
+  background: var(--card); border: 2px solid var(--gold); border-radius: 22px;
+  padding: 22px 26px; text-align: center; box-shadow: 0 10px 34px rgba(43,38,32,.22);
+  max-width: 78%;
+}
+.toast-master .tm-char { font-size: 84px; line-height: 1; }
+.toast-master .tm-txt { font-size: 19px; font-weight: 800; color: var(--gold); margin-top: 8px; }
+.toast-master .tm-sub { font-size: 13.5px; color: var(--ink-soft); margin-top: 5px; line-height: 1.35; }
+@keyframes masterIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+.toast-master.out { opacity: 0; transition: opacity .35s; }
 /* the reading + meaning, revealed only once the word has been said */
 .voice-panel .p-sub { font-size: 15px; color: var(--ink-soft); min-height: 22px; margin: -6px 0 8px; }
 .voice-panel .p-sub .jp { font-size: 18px; color: var(--ink); }

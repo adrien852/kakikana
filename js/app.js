@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.9.1";
+  window.APP_VERSION = "1.10.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -41,6 +41,17 @@
     const streak = Engine.state.streak.count;
     const active = Engine.state.kanjiActive;
 
+    // A character can only bank one day of credit per calendar day, so once
+    // everything in progress has been practised, the day holds no more progress
+    // — this line says whether that ceiling has been reached.
+    function dayLine(track) {
+      const d = Engine.dailyProgress(track);
+      if (!d.studying) return "";
+      if (!d.left) return `<div class="day-line full">✓ ${t("day_maxed")}</div>`;
+      const txt = d.left === 1 ? t("day_left_one") : t("day_left").replace("{n}", d.left);
+      return `<div class="day-line">${txt}</div>`;
+    }
+
     function trackCard(track, cls, ico, title, stats) {
       const pct = Math.round(100 * (stats.known || 0) / stats.total);
       return `<div class="card track-start" data-track="${track}" style="cursor:pointer">
@@ -50,6 +61,7 @@
             <div class="track-title">${title}</div>
             <div class="track-sub">${stats.seen}/${stats.total} ${t("stats_seen")} · ${stats.mastered} ${t("stats_mastered")}</div>
             <div class="pbar"><div style="width:${pct}%"></div></div>
+            ${dayLine(track)}
           </div>
           <div style="color:var(--ink-soft);font-size:20px">▶</div>
         </div>

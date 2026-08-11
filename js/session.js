@@ -182,6 +182,7 @@
         sfx(justMastered ? "master" : ok ? "good" : "soso");
         if (dictation) reveal();
         flash(ok ? t("correct") : t("almost"), ok ? "good" : "bad");
+        if (justMastered) masteryToast(ch);
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
         // kanji: writing and pronunciation are two halves of the same encounter
@@ -190,7 +191,7 @@
           if (!advancing || !live) return;
           if (reading) renderVoice({ ch, type: "voice", reading }, true);
           else { idx++; next(); }
-        }, 1300);
+        }, justMastered ? 2200 : 1300);
       }
     }, { hintPlan: plan, dictation: !!dictation });
     // what the dictation was, shown once the answer is in (or on demand)
@@ -217,6 +218,20 @@
     // play the dictation on arrival; otherwise only on brand-new characters
     if (dictation) setTimeout(() => { if (live) Voice.speak(speakText); }, 350);
     else if (it.tag === "new" || stage <= 0) setTimeout(() => { if (live) Voice.speak(speakText); }, 400);
+  }
+
+  // Mastery is rare — a character is only mastered once in the whole course —
+  // so it gets its own moment rather than a slightly different chime.
+  function masteryToast(ch) {
+    const el = document.createElement("div");
+    el.className = "toast-master";
+    el.innerHTML = `<div class="tm-card">
+      <div class="tm-char jp">${ch}</div>
+      <div class="tm-txt">🏆 ${t("mastered_now")}</div>
+      <div class="tm-sub">${t("mastered_now_sub")}</div></div>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add("out"), 1500);
+    setTimeout(() => el.remove(), 1900);
   }
 
   function flash(msg, cls) {
@@ -388,6 +403,7 @@
   // leaving the session: kill pending timers so nothing renders over the next screen
   function stop() {
     live = false; advancing = false;
+    document.querySelectorAll(".toast-master").forEach(el => el.remove());
     if (current) { current.destroy(); current = null; }
     if (window.Voice) Voice.cancel();
     try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}

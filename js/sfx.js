@@ -96,10 +96,16 @@
     bad() { tone(233, { dur: 0.13, gain: 0.26, type: "triangle" }); tone(174, { dur: 0.26, gain: 0.24, type: "triangle", delay: 0.1 }); },
     // exam MCQ correct
     right() { tone(N.G5, { dur: 0.13, gain: 0.30 }); tone(N.D6, { dur: 0.22, gain: 0.24, delay: 0.08 }); },
-    // a character reached "mastered"
+    // A character reached "mastered". This has to be unmistakable — it happens
+    // a hundred times in the whole course, not several times a session — so it
+    // is the only sound with a struck bell and a held chord under the run.
     master() {
-      [N.D5, N.E5, N.G5, N.A5, N.D6].forEach((f, i) =>
-        tone(f, { dur: 0.34, gain: 0.24, delay: i * 0.07 }));
+      noise({ freq: 2600, gain: 0.10, dur: 0.5 });                       // the strike
+      [N.D5, N.G5, N.A5, N.D6, N.E5, N.G5].forEach((f, i) =>             // rising run, then a turn
+        tone(f, { dur: 0.3, gain: 0.22, delay: i * 0.085, type: "sine" }));
+      tone(N.D6, { dur: 1.1, gain: 0.20, delay: 0.5 });                  // the bell it lands on
+      tone(N.A5, { dur: 1.1, gain: 0.12, delay: 0.52, type: "sine" });   // held fifth underneath
+      tone(N.D4, { dur: 1.2, gain: 0.13, delay: 0.5, type: "triangle" });
     },
     // end of a session / exam
     fanfare() {

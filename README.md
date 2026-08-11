@@ -38,6 +38,15 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.10.0
+
+- **Every character being learned now shows how far it is from mastery.** Mastery needs two things at once — a number of unaided successes *and* a number of distinct days — so the library shows them as two separate bars (e.g. *4/5 réussites sans aide*, *2/3 jours différents*) rather than one figure that would hide the fact that the days cannot be rushed. A note says whether today already counts for that character. Mastered characters show nothing, since there is nothing left to do.
+- **A hairline under each character in the grid** gives the same figure at a glance, on kana and kanji alike. It is the weaker of the two conditions, because both have to land.
+- **Reaching mastery is now its own moment**: a distinct chime — a struck bell over a held chord, used nowhere else — and a card naming the character, held a second longer before the session moves on.
+- **The category cards say how much progress the day can still hold.** Because a character banks at most one day of credit per calendar day, practising everything currently being learned is the ceiling. Each card shows either *N caractères pas encore revus aujourd'hui* or, once you are there, *✓ Progression du jour au maximum*. The main card still just says whether the day's session is done.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.9.1
 
 - **The reading is no longer written on the writing prompt.** The two buttons now say only 音 ON and 訓 KUN — tap either to hear it. Printing さん / *san* next to them handed you the answer to the pronunciation exercise that comes right after.
