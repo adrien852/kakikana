@@ -38,6 +38,17 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.11.0
+
+- **Three new full exams: hiragana, katakana, kanji.** Where the mixed exam samples a handful of mastered kanji, a full exam sweeps *everything* you have mastered in one script, once per question type — writing and reading for kana, writing, meaning and reading for kanji. The card tells you the length before you start (24 mastered hiragana → 48 questions), because these are meant to be long.
+- The two or three questions about the same character are kept apart in the running order, so one never answers the next.
+- **じ / ぢ and ず / づ** share a romaji, so "write the character for « ji »" would be an unanswerable question. Those four — and only those four — also show which character they are voiced from (し + ゛).
+- Wrong answers in the kana reading questions now share a vowel or a consonant with the right one, so the choice is a real one rather than four unrelated syllables.
+- After a full exam the result lists only what you missed, not all 48 lines. The exam history says which exam each entry was.
+- **The mixed exam is untouched** — same 15 questions, same behaviour.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.10.0
 
 - **Every character being learned now shows how far it is from mastery.** Mastery needs two things at once — a number of unaided successes *and* a number of distinct days — so the library shows them as two separate bars (e.g. *4/5 réussites sans aide*, *2/3 jours différents*) rather than one figure that would hide the fact that the days cannot be rushed. A note says whether today already counts for that character. Mastered characters show nothing, since there is nothing left to do.
@@ -144,7 +155,7 @@ To update your installed app: upload these files over the old ones in your GitHu
 - **Pronunciation exercise**: read the kanji aloud with its own ON or KUN reading (labelled), or say a kana example word; validated automatically (online uses the device's recognizer — free, unlimited; offline works after downloading the optional ≈40 MB voice pack in Settings). It is practice only — a miss or a skip never affects your progress.
 - **Dictation**: once a character is solid, some encounters arrive audio-first — you hear the word and write the character without seeing it.
 - **Library**: kana in gojūon order with tap-to-hear; kanji sortable by difficulty, theme, or newest/oldest learned; each kanji has readings, meanings, character-origin explanations (pictograph, compound…), example words and sentences with audio, and a mic to try any of them. Mark the kanji you want to learn next.
-- **Exams** on mastered kanji only: writing, meaning and reading, no help, with history.
+- **Exams** on mastered characters only, no help, with history: a short mixed exam on kanji, plus a full sweep of every mastered hiragana, katakana or kanji.
 - **French / English** interface. Translations are always from the Japanese.
 - **100% offline** after the first load; progress export/import.
 

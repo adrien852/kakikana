@@ -606,9 +606,19 @@
     });
     return { total, seen, mastered, known };
   }
-  function masteredKanji() {
-    return KANJI.filter(k => { const p = S.chars[k.k]; return p && (p.mastered || p.known); }).map(k => k.k);
+  // every mastered (or self-declared known) character of a track, in library order
+  function masteredChars(which) {
+    let list;
+    if (which === "hiragana") list = HIRA_ALL;
+    else if (which === "katakana") list = KATA_ALL;
+    else if (which === "kanji") list = KANJI;
+    else list = HIRA_ALL.concat(KATA_ALL).concat(KANJI);
+    return list.map(k => k.k).filter(ch => {
+      const p = S.chars[ch];
+      return p && (p.mastered || p.known);
+    });
   }
+  function masteredKanji() { return masteredChars("kanji"); }
   function totalDue() {
     const all = HIRA_ALL.concat(KATA_ALL).map(k => k.k).concat(KANJI.map(k => k.k));
     return dueChars(all).length;
@@ -634,7 +644,7 @@
     kanjiReadings, readingAccepts, pickReading, readingType, ttsReadings,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
-    trackStats, masteryProgress, dailyProgress, masteredKanji, totalDue, bumpStreak,
+    trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, totalDue, bumpStreak,
     exportState, importState, resetAll
   };
 })();
