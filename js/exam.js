@@ -28,13 +28,19 @@
   function render() {
     const v = document.getElementById("view");
     const mastered = Engine.masteredKanji();
-    const hist = Engine.state.exams.slice().reverse().slice(0, 12);
+    // newest first, but the index has to point back into the stored array
+    const all = Engine.state.exams;
+    const hist = all.map((e, i) => ({ e, i })).reverse().slice(0, 12);
     const histHtml = hist.length ? `<h2>${t("exam_history")}</h2><div class="card exam-hist">` +
-      hist.map(e => {
+      hist.map(({ e, i }) => {
         const pct = Math.round(100 * e.score / e.total);
-        return `<div class="row"><span>${new Date(e.date).toLocaleDateString()}
-            <span class="muted" style="font-size:12px">${modeLabel(e.mode)}</span></span>
-          <span><b>${e.score}/${e.total}</b> · ${pct}% ${pct >= 70 ? "✅" : "❌"}</span></div>`;
+        const n = (e.misses || []).length;
+        return `<div class="row" data-exam="${i}">
+          <span>${new Date(e.date).toLocaleDateString()}
+            <span class="muted" style="font-size:12px">${modeLabel(e.mode)}</span>
+            ${n ? `<span class="muted" style="font-size:12px">· ${n} ${t("exam_errors")}</span>` : ""}</span>
+          <span><b>${e.score}/${e.total}</b> · ${pct}% ${pct >= 70 ? "✅" : "❌"} <span class="chev">›</span></span>
+        </div>`;
       }).join("") + `</div>` : "";
 
     function fullCard(track, ico, title) {
@@ -72,6 +78,42 @@
     if (b) b.onclick = () => startExam(null);
     v.querySelectorAll("[data-full]").forEach(x =>
       x.onclick = () => startExam(x.dataset.full));
+    v.querySelectorAll("[data-exam]").forEach(x =>
+      x.onclick = () => { sfx("pop"); showDetail(Engine.state.exams[+x.dataset.exam]); });
+  }
+
+  // ---------- what went wrong, from the history ----------
+  function kindLabel(k) {
+    return t("exam_" + (k === "draw" ? "writing" : k === "kread" ? "reading" : k));
+  }
+  // the list can run to dozens of characters; show enough to recognise the damage
+  function charList(list) {
+    const shown = list.slice(0, 14).join(" ");
+    return `<span class="jp">${shown}</span>${list.length > 14 ? ` +${list.length - 14}` : ""}`;
+  }
+
+  function showDetail(e) {
+    if (!e) return;
+    const pct = Math.round(100 * e.score / e.total);
+    const misses = e.misses || [];
+    // exams taken before v1.12 stored only the score
+    const body = !misses.length
+      ? `<p class="muted">${e.total && e.score === e.total ? t("exam_all_right") : t("exam_no_detail")}</p>`
+      : `<div class="miss-list">${misses.map(m => `<div class="miss">
+          <span class="jp miss-ch">${m.ch}</span>
+          <span class="muted">${kindLabel(m.kind)}</span></div>`).join("")}</div>`;
+    const back = (e.demoted || []).length
+      ? `<p class="muted" style="font-size:13px">${t("exam_demoted").replace("{n}", e.demoted.length)}
+           ${charList(e.demoted)}</p>`
+      : "";
+    App.modal(`<h2 style="margin-top:0">${modeLabel(e.mode)}</h2>
+      <div class="track-sub" style="margin:-6px 0 10px">${new Date(e.date).toLocaleString()} ·
+        <b>${e.score}/${e.total}</b> (${pct}%)</div>
+      ${misses.length ? `<div class="track-sub" style="margin-bottom:6px">${t("exam_missed")}</div>` : ""}
+      ${body}${back}
+      <button class="btn secondary mt16" id="det-close">${t("close")}</button>`);
+    const c = document.getElementById("det-close");
+    if (c) c.onclick = () => App.closeModal();
   }
 
   // ---------- building the paper ----------
@@ -274,12 +316,23 @@
   function finish() {
     live = false;
     sfx("fanfare");
-    Engine.state.exams.push({ date: Date.now(), score: right, total: qs.length, mode: mode });
+    const missed = detail.filter(d => !d.ok);
+    // A kana missed in an exam was not as solid as its "mastered" badge claimed,
+    // so it drops back to "known" and has to earn the badge again. Kanji are left
+    // alone: their meaning and reading questions are multiple choice, and one bad
+    // guess is not evidence that the writing has gone.
+    const missedKana = [...new Set(missed.map(d => d.ch)
+      .filter(ch => Engine.charType(ch) !== "kanji"))];
+    const demoted = Engine.demoteAll(missedKana);
+    Engine.state.exams.push({
+      date: Date.now(), score: right, total: qs.length, mode: mode,
+      misses: missed.map(d => ({ ch: d.ch, kind: d.kind })),
+      demoted: demoted
+    });
+    // keep the stored history from growing without bound
+    if (Engine.state.exams.length > 60) Engine.state.exams = Engine.state.exams.slice(-60);
     Engine.save();
     const pct = Math.round(100 * right / qs.length);
-    const kindLabel = k => t("exam_" + (k === "draw" ? "writing" : k === "kread" ? "reading" : k));
-    // a full sweep produces hundreds of lines; only the misses are worth listing
-    const missed = detail.filter(d => !d.ok);
     const listed = mode ? missed : detail;
     const listHtml = listed.length
       ? `<div class="card" style="text-align:left;margin-top:16px">
@@ -295,6 +348,8 @@
       <p class="muted" style="margin:-6px 0 0">${modeLabel(mode)}</p>
       <p style="font-size:28px;font-weight:800">${right}/${qs.length} <span class="muted">(${pct}%)</span></p>
       <p><span class="pill ${pct >= 70 ? "mastered" : "learning"}">${pct >= 70 ? t("exam_pass") : t("exam_fail")}</span></p>
+      ${demoted.length ? `<p class="muted" style="font-size:13.5px;margin-top:14px">
+        ${t("exam_demoted").replace("{n}", demoted.length)} ${charList(demoted)}</p>` : ""}
       ${listHtml}
       <button class="btn mt16" id="ex-back">${t("continue")}</button>
     </div>`;

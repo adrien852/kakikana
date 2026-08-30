@@ -38,6 +38,15 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.12.0
+
+- **Tap any line in the exam history to see what you got wrong.** Each entry now records the exact questions you missed — character and question type — and opens them as a list. A row also shows the error count at a glance.
+- **A kana you miss in an exam drops back to "Acquis".** Missing it is evidence it was not as solid as the badge claimed, so it loses mastery, becomes due again immediately, and has to re-earn the unaided successes and the distinct days from scratch — otherwise the next single success would hand the badge straight back. The exam result and the history entry both name the characters that were sent back.
+- **Kanji are deliberately left alone**: their meaning and reading questions are multiple choice, and one bad guess out of four is not evidence that the writing has gone. Say the word if you want them demoted too.
+- Exams taken before this version show "no detail recorded" — there was nothing to store at the time. The stored history is capped at the last 60 exams.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.11.0
 
 - **Three new full exams: hiragana, katakana, kanji.** Where the mixed exam samples a handful of mastered kanji, a full exam sweeps *everything* you have mastered in one script, once per question type — writing and reading for kana, writing, meaning and reading for kanji. The card tells you the length before you start (24 mastered hiragana → 48 questions), because these are meant to be long.

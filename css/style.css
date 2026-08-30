@@ -298,3 +298,14 @@ select, input[type=number] {
   display: flex; align-items: center; justify-content: center;
   font-size: 21px; background: var(--paper); border: 1.5px solid var(--line);
 }
+/* exam history: a row opens what went wrong */
+.exam-hist .row[data-exam] { cursor: pointer; }
+.exam-hist .row[data-exam]:active { background: var(--paper); }
+.exam-hist .chev { color: var(--ink-soft); font-size: 17px; margin-left: 4px; }
+.miss-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.miss {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1.5px solid var(--line); border-radius: 12px; background: var(--card);
+  font-size: 12px;
+}
+.miss-ch { font-size: 22px; line-height: 1; }

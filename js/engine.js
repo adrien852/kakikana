@@ -606,6 +606,32 @@
     });
     return { total, seen, mastered, known };
   }
+  // ---- losing mastery -------------------------------------------------------
+  // Missing a character in an exam is evidence it was not solid after all, so it
+  // drops back to "known": still a learned character, no longer mastered, due
+  // again straight away, and the mastery evidence starts over — otherwise the
+  // very next success would re-master it and the demotion would mean nothing.
+  function demote(ch) {
+    const p = S.chars[ch];
+    if (!p || !(p.mastered || p.known)) return false;
+    p.mastered = false;
+    p.known = false;
+    p.unaided = 0;
+    p.days = [];
+    p.box = 3;                       // status() reads box >= 3 as "known"
+    p.enc = Math.max(p.enc, 1);      // a self-declared "known" char has enc 0
+    p.due = Date.now();
+    if (p.learnedAt === null) p.learnedAt = Date.now();
+    save();
+    return true;
+  }
+  // returns the characters that actually lost mastery
+  function demoteAll(chars) {
+    const out = [];
+    (chars || []).forEach(ch => { if (demote(ch)) out.push(ch); });
+    return out;
+  }
+
   // every mastered (or self-declared known) character of a track, in library order
   function masteredChars(which) {
     let list;
@@ -644,7 +670,8 @@
     kanjiReadings, readingAccepts, pickReading, readingType, ttsReadings,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
-    trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, totalDue, bumpStreak,
+    trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, demoteAll,
+    totalDue, bumpStreak,
     exportState, importState, resetAll
   };
 })();
