@@ -35,7 +35,12 @@
     } catch (e) {}
     return JSON.parse(JSON.stringify(DEFAULTS));
   }
-  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+    // keep the Kakibun bridge in step with every change (defined further down,
+    // so guard the very first save during module set-up)
+    if (typeof writeExport === "function") writeExport();
+  }
 
   // ---- character lists ----
   const KANJI = window.KANJI_PARTS.slice().sort((a, b) => a.d - b.d);
@@ -622,13 +627,14 @@
     p.enc = Math.max(p.enc, 1);      // a self-declared "known" char has enc 0
     p.due = Date.now();
     if (p.learnedAt === null) p.learnedAt = Date.now();
-    save();
     return true;
   }
-  // returns the characters that actually lost mastery
+  // returns the characters that actually lost mastery; saves once, not per
+  // character — a failed full exam can demote seventy of them at a time
   function demoteAll(chars) {
     const out = [];
     (chars || []).forEach(ch => { if (demote(ch)) out.push(ch); });
+    if (out.length) save();
     return out;
   }
 
@@ -648,6 +654,47 @@
   function totalDue() {
     const all = HIRA_ALL.concat(KATA_ALL).map(k => k.k).concat(KANJI.map(k => k.k));
     return dueChars(all).length;
+  }
+
+  // ---- the Kakibun bridge ---------------------------------------------------
+  // Kakibun (the sentence app) is served from the same origin, so it can read
+  // this key straight out of localStorage and decide which kanji to show in
+  // kanji rather than kana. It is rewritten on every save, so his progress here
+  // is current over there without any manual export.
+  //   mastered = status "mastered"   (includes "I already know this")
+  //   known    = status "known"      (box >= 3, not yet mastered)
+  //   learning = started, not yet solid
+  const EXPORT_KEY = "kakikana.export.v1";
+
+  function bucket(list, withLearning) {
+    const out = { mastered: [], known: [] };
+    if (withLearning) out.learning = [];
+    list.forEach(k => {
+      const st = status(k.k);
+      if (st === "mastered") out.mastered.push(k.k);
+      else if (st === "known") out.known.push(k.k);
+      else if (withLearning && st === "learning") out.learning.push(k.k);
+    });
+    return out;
+  }
+  function buildExport() {
+    return {
+      app: "kakikana",
+      v: 1,
+      date: new Date().toISOString(),
+      kanji: bucket(KANJI, true),
+      hiragana: bucket(HIRA_ALL, false),
+      katakana: bucket(KATA_ALL, false)
+    };
+  }
+  function exportForBridge() { return JSON.stringify(buildExport(), null, 1); }
+  // Written unconditionally on every save. Skipping identical payloads would be
+  // a false economy: it is a few hundred short strings, and if anything else ever
+  // clobbers the key, an unconditional write is what repairs it.
+  function writeExport() {
+    try {
+      localStorage.setItem(EXPORT_KEY, JSON.stringify(buildExport()));
+    } catch (e) {}          // private mode, quota — never break a save over this
   }
 
   // ---- import / export ----
@@ -672,6 +719,10 @@
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
     trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, demoteAll,
     totalDue, bumpStreak,
-    exportState, importState, resetAll
+    exportState, importState, resetAll,
+    exportForBridge, EXPORT_KEY
   };
+
+  // publish once at boot, so an install that never saves still reaches Kakibun
+  writeExport();
 })();

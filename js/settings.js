@@ -96,6 +96,9 @@
         <div class="set-row"><div class="set-lbl">${t("import_progress")}</div>
           <button class="btn secondary small" id="btn-import">⬆︎</button>
           <input type="file" id="import-file" accept=".json,application/json" style="display:none"></div>
+        <div class="set-row"><div class="set-lbl">${t("export_bridge")}
+          <div class="set-sub">${t("export_bridge_sub")}</div></div>
+          <button class="btn secondary small" id="btn-bridge">⬇︎</button></div>
         <div class="set-row"><div class="set-lbl" style="color:var(--red)">${t("reset_progress")}</div>
           <button class="btn secondary small" id="btn-reset" style="color:var(--red)">🗑</button></div>
       </div>
@@ -142,6 +145,16 @@
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "kakikana-progression-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    // the same file Kakibun picks up from localStorage, for moving it by hand
+    // between browsers or devices
+    document.getElementById("btn-bridge").onclick = () => {
+      const blob = new Blob([Engine.exportForBridge()], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "kakikana-export.json";
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     };

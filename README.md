@@ -38,6 +38,13 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.13.0
+
+- **KakiKana now publishes your progress for Kakibun.** Every time your progress is saved, it writes a small summary to `localStorage["kakikana.export.v1"]` — which kanji are mastered, which are known, which are still being learned, plus the same for kana. Kakibun, served from the same site, reads that key at startup and uses it to decide which words it can show in kanji rather than kana. Nothing to press: keep practising here and Kakibun keeps up.
+- **Réglages → Données → Exporter pour Kakibun** downloads the same summary as a file, for when the two apps are not in the same browser (a different device, say) and you want to carry your progress across by hand.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.12.0
 
 - **Tap any line in the exam history to see what you got wrong.** Each entry now records the exact questions you missed — character and question type — and opens them as a list. A row also shows the error count at a glance.
