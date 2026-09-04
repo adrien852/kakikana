@@ -38,6 +38,18 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.15.0
+
+- **The relay now lives here, in both directions.** KakiKana sends your progress up to the shared relay and pulls back the words you mined while playing. Kakibun used to do the sending half; it has no use for any of it any more, so the whole client moved across.
+- **What goes up is better than what Kakibun sent.** Kakibun could only publish a flat list of characters it had seen; KakiKana publishes the real *maîtrisé / acquis / en apprentissage* split, which is exactly what KakiBridge needs to decide whether to grey out a word inside Yomitan. That gap is closed.
+- **What comes down fills the « Jeux » tab by itself** — no file to download and import any more.
+- **Réglages → Relais**: paste the relay address, tap Enregistrer, and leave automatic sync on. A status line tells you when something last went out and came back. Sending is debounced and only happens when something actually changed; a failed attempt is retried rather than forgotten; a relay that is down never interrupts a lesson.
+- An `http://` address on your home network is refused **with the reason**: an HTTPS page cannot call plain HTTP, so it would fail silently forever. Use the relay's `https://` address.
+
+**If you still have Kakibun's sync switched on, turn it off** — both apps writing the same box would overwrite each other, and KakiKana's version is the one KakiBridge wants.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.14.0
 
 - **A fourth library tab, « Jeux »**: the kanji you have actually met while playing, collected by KakiBridge from your Yomitan lookups. Filter by game, sort by most-seen or most-recent. Tap one to see how often it came up, in which games, and the words it appeared in (with audio).

@@ -2,6 +2,27 @@
 (function () {
   function t(k) { return App.t(k); }
 
+  // "il y a 2 min" rather than a full timestamp, which wraps on a phone
+  function ago(ms) {
+    if (!ms) return null;
+    const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (s < 60) return t("ago_now");
+    const m = Math.round(s / 60);
+    if (m < 60) return t("ago_min").replace("{n}", m);
+    const h = Math.round(m / 60);
+    if (h < 24) return t("ago_hour").replace("{n}", h);
+    return t("ago_day").replace("{n}", Math.round(h / 24));
+  }
+  function relayLine() {
+    const st = Sync.status();
+    if (!st.url) return t("relay_none");
+    if (st.lastErr) return "⚠ " + t("relay_failed") + " — " + st.lastErr;
+    const bits = [];
+    if (st.lastPush) bits.push(t("relay_sent") + " " + ago(st.lastPush));
+    if (st.lastPull) bits.push(t("relay_got") + " " + ago(st.lastPull));
+    return bits.length ? bits.join(" · ") : t("relay_waiting");
+  }
+
   function render() {
     const S = Engine.state;
     const st = S.settings;
@@ -89,6 +110,23 @@
         </div>
       </div>
 
+      <h2>${t("settings_relay")}</h2>
+      <div class="card">
+        <p class="muted" style="margin-top:0;font-size:12.5px">${t("relay_desc")}</p>
+        <input type="url" id="relay-url" class="text-in" placeholder="https://…/s/mon-secret"
+               value="${(Sync.status().url || "").replace(/"/g, "&quot;")}" autocomplete="off"
+               autocapitalize="off" spellcheck="false">
+        <div class="relay-actions">
+          <button class="btn secondary small" id="relay-save">${t("relay_save")}</button>
+          <button class="btn secondary small" id="relay-now">${t("relay_now")}</button>
+        </div>
+        <div class="set-row"><div class="set-lbl">${t("relay_auto")}
+          <div class="set-sub">${t("relay_auto_sub")}</div></div>
+          <label class="switch"><input type="checkbox" id="relay-auto" ${Sync.status().auto ? "checked" : ""}><span></span></label>
+        </div>
+        <div class="muted" id="relay-status" style="font-size:12.5px">${relayLine()}</div>
+      </div>
+
       <h2>${t("settings_data")}</h2>
       <div class="card">
         <div class="set-row"><div class="set-lbl">${t("export_progress")}</div>
@@ -143,6 +181,30 @@
         dl.disabled = false;
       }
     };
+
+    // ---- relay ----
+    const rUrl = document.getElementById("relay-url");
+    const rStat = document.getElementById("relay-status");
+    const refreshLine = () => { if (rStat) rStat.textContent = relayLine(); };
+    document.getElementById("relay-save").onclick = () => {
+      const r = Sync.setUrl(rUrl.value);
+      if (!r.ok) { alert(t(r.why)); return; }
+      sfx("tap");
+      rUrl.value = r.url;
+      refreshLine();
+      if (r.url) Sync.syncNow().then(refreshLine);
+    };
+    document.getElementById("relay-now").onclick = async () => {
+      if (!Sync.configured()) { alert(t("relay_none")); return; }
+      const btn = document.getElementById("relay-now");
+      btn.disabled = true; rStat.textContent = t("relay_working");
+      const res = await Sync.syncNow();
+      btn.disabled = false;
+      refreshLine();
+      if (res.err) alert(t("relay_failed") + "\n" + res.err);
+      else if (res.mined) App.go("library");
+    };
+    document.getElementById("relay-auto").onchange = e => { Sync.setAuto(e.target.checked); refreshLine(); };
 
     document.getElementById("btn-export").onclick = () => {
       const blob = new Blob([Engine.exportState()], { type: "application/json" });

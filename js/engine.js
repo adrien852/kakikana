@@ -40,6 +40,8 @@
     // keep the Kakibun bridge in step with every change (defined further down,
     // so guard the very first save during module set-up)
     if (typeof writeExport === "function") writeExport();
+    // …and let the relay know there is something new to send (debounced there)
+    if (window.Sync && Sync.pushSoon) Sync.pushSoon();
   }
 
   // ---- character lists ----

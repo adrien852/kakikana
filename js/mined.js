@@ -180,7 +180,7 @@
   // The two sources are kept apart on purpose. A KakiBridge export is a whole
   // snapshot, so re-importing it must replace rather than add — summing would
   // double every count. The shared key is merged as a separate layer.
-  let S = { v: 1, file: null, focus: null };
+  let S = { v: 1, file: null, focus: null, relay: null };
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
@@ -206,13 +206,27 @@
     } catch (e) { return false; }
   }
 
+  // The relay hands back a bare array of mined words. Like a file import this is
+  // a whole snapshot, so it replaces its layer rather than adding to it.
+  // Returns the number of kanji it now knows about, or 0 for an empty box.
+  function ingestRelay(data, at) {
+    const words = Array.isArray(data) ? data : (data && findWordList(data)) || [];
+    if (!words.length) { S.relay = null; save(); return 0; }
+    let parsed;
+    try { parsed = parse({ words }); } catch (e) { return 0; }
+    if (at) parsed.at = new Date(at).toISOString();
+    S.relay = parsed;
+    save();
+    return Object.keys(parsed.kanji).length;
+  }
+
   function importText(text) {
     const parsed = parse(typeof text === "string" ? JSON.parse(text) : text);
     S.file = parsed;
     save();
     return { kanji: Object.keys(parsed.kanji).length, words: parsed.words, games: parsed.games };
   }
-  function clear() { S = { v: 1, file: null, focus: null }; save(); }
+  function clear() { S = { v: 1, file: null, focus: null, relay: null }; save(); }
 
   // ---------- reading it back ----------
   // The file layer wins where both know a kanji: it carries the words, and the
@@ -233,8 +247,9 @@
         if (e.last && (!o.last || e.last > o.last)) o.last = e.last;
       });
     };
-    add(S.focus);
-    add(S.file);      // second, so its richer records win
+    add(S.focus);     // a bare score map, if Kakibun ever writes the key again
+    add(S.relay);     // full word records, straight off the relay
+    add(S.file);      // a hand-picked file wins over everything
     return out;
   }
 
@@ -262,16 +277,19 @@
   function get(ch) { return merged()[ch] || null; }
   function count() { return Object.keys(merged()).length; }
   function lastUpdate() {
-    const a = S.file && S.file.at, b = S.focus && S.focus.at;
-    return (a && b) ? (a > b ? a : b) : (a || b || "");
+    return [S.file, S.relay, S.focus].map(x => x && x.at).filter(Boolean)
+      .sort().pop() || "";
   }
   function hasData() { return count() > 0; }
+  // does the relay layer specifically still hold something? (the sync client
+  // uses this to decide whether an unchanged box is worth re-ingesting)
+  function hasRelay() { return !!(S.relay && Object.keys(S.relay.kanji).length); }
 
   load();
   readShared();
 
   window.Mined = {
-    importText, clear, readShared, list, games, get, count, hasData, lastUpdate,
+    importText, ingestRelay, clear, readShared, list, games, get, count, hasData, hasRelay, lastUpdate,
     isKanji, parse, STORE_KEY, FOCUS_KEY
   };
 })();
