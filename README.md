@@ -38,6 +38,16 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.14.0
+
+- **A fourth library tab, « Jeux »**: the kanji you have actually met while playing, collected by KakiBridge from your Yomitan lookups. Filter by game, sort by most-seen or most-recent. Tap one to see how often it came up, in which games, and the words it appeared in (with audio).
+- **Read-only, on purpose.** Most of these are far outside the 104 the course teaches, so none of them ever enter a session, an exam or your progress. It is a record of what you have run into, not a syllabus.
+- A mined kanji that *is* one of the 104 shows its usual status and links straight to its full entry; one that is not is marked "hors programme" with a dashed border.
+- **Two ways in, both optional**: the list arrives on its own from the key Kakibun writes after its own import, and *Réglages → Données → Importer un fichier KakiBridge* takes KakiBridge's export file directly. Re-importing replaces rather than adds, so counts never double.
+- The export KakiBridge reads to grey out words you already know is untouched and still written on every save.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.13.0
 
 - **KakiKana now publishes your progress for Kakibun.** Every time your progress is saved, it writes a small summary to `localStorage["kakikana.export.v1"]` — which kanji are mastered, which are known, which are still being learned, plus the same for kana. Kakibun, served from the same site, reads that key at startup and uses it to decide which words it can show in kanji rather than kana. Nothing to press: keep practising here and Kakibun keeps up.

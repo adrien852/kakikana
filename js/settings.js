@@ -99,6 +99,10 @@
         <div class="set-row"><div class="set-lbl">${t("export_bridge")}
           <div class="set-sub">${t("export_bridge_sub")}</div></div>
           <button class="btn secondary small" id="btn-bridge">⬇︎</button></div>
+        <div class="set-row"><div class="set-lbl">${t("mined_import")}
+          <div class="set-sub">${t("mined_import_sub")}</div></div>
+          <button class="btn secondary small" id="btn-mined">⬆︎</button>
+          <input type="file" id="mined-file-set" accept=".json,application/json" style="display:none"></div>
         <div class="set-row"><div class="set-lbl" style="color:var(--red)">${t("reset_progress")}</div>
           <button class="btn secondary small" id="btn-reset" style="color:var(--red)">🗑</button></div>
       </div>
@@ -166,6 +170,22 @@
       r.onload = () => {
         try { Engine.importState(r.result); App.applyLang(); App.go("home"); }
         catch (err) { alert("Fichier invalide / invalid file"); }
+      };
+      r.readAsText(f);
+    };
+    // KakiBridge's mined-word export → the "Jeux" tab in the library
+    document.getElementById("btn-mined").onclick = () => document.getElementById("mined-file-set").click();
+    document.getElementById("mined-file-set").onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const res = Mined.importText(r.result);
+          alert(t("mined_imported").replace("{k}", res.kanji).replace("{w}", res.words)
+            .replace("{g}", res.games.length ? res.games.join(", ") : "—"));
+          App.go("library");
+        } catch (err) { alert(t("mined_bad_file")); }
       };
       r.readAsText(f);
     };

@@ -168,6 +168,9 @@
     if (KANJI_MAP[ch]) return "kanji";
     const c = ch.codePointAt(0);
     if (c >= 0x3040 && c <= 0x309f) return "hiragana";
+    // a kanji mined in a game is outside the 104, and must not fall through to
+    // "katakana" just because it is not in the course
+    if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf)) return "kanji";
     return "katakana";
   }
 
