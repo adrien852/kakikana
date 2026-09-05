@@ -16,6 +16,7 @@
     kanjiActive: [],  // kanji currently in practice
     kanjiWanted: [],  // kanji the user asked to learn next (jump the queue)
     kanjiOrder: [],   // chars in the order they entered practice/known
+    readingPref: {},      // per-kanji: which reading he wants to hear and say
     lastIntroDay: null,   // new characters are introduced once a day
     lastSessionDay: null, // …and the day's session is only owed once
     exams: [],
@@ -30,7 +31,12 @@
       if (raw) {
         const s = JSON.parse(raw);
         s.settings = Object.assign({}, DEFAULTS.settings, s.settings || {});
-        return Object.assign({}, DEFAULTS, s);
+        const merged = Object.assign({}, DEFAULTS, s);
+        // a save written before this key existed would otherwise share the
+        // DEFAULTS object itself, and pinning a reading would poison the
+        // defaults for the rest of the session — including a reset
+        merged.readingPref = Object.assign({}, s.readingPref || {});
+        return merged;
       }
     } catch (e) {}
     return JSON.parse(JSON.stringify(DEFAULTS));
@@ -86,12 +92,22 @@
   // homophones written differently are correct too
   function readingAccepts(rd) {
     if (!rd) return [];
-    return [rd.r, rd.k, rd.ro].concat(rd.alt || []).filter(Boolean);
+    return [rd.r, rd.k, rd.ro, rd.disp].concat(rd.alt || []).filter(Boolean);
   }
   // Which reading to ask for. Both readings of a kanji are used equally until each
   // has been said right a few times, then either may come up.
   function pickReading(ch, excludeR) {
-    const all = kanjiReadings(ch).filter(r => r.r !== excludeR);
+    // a pinned reading wins outright. If he pinned one that is too short to be
+    // heard, the spoken exercise is skipped rather than quietly asking for a
+    // different reading than the one he chose.
+    const every = allReadings(ch);
+    const pin = readingPref(ch);
+    if (pin) {
+      const hit = every.filter(r => r.r === pin)[0];
+      if (hit) return (hit.pin && hit.r !== excludeR) ? hit : null;
+    }
+    // left to itself the app still only ever asks for a curated reading
+    const all = every.filter(r => r.curated && r.say && r.r !== excludeR);
     if (!all.length) return null;
     if (all.length === 1) return all[0];
     const rd = (S.chars[ch] && S.chars[ch].rd) || {};
@@ -107,6 +123,82 @@
   }
   const kata2hira = s => (s || "").replace(/[ァ-ヶ]/g,
     c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
+  // ---- how long a reading actually sounds --------------------------------
+  // Not morae: a syllable as a learner says it and a recogniser hears it. Small
+  // ゃゅょ ride the kana before them, and a long vowel is one sound however it is
+  // spelled. So じゅう, とお, こう and ほん are one syllable each, while ひゃく,
+  // やま and がつ are two. Anything under two is hopeless for speech recognition
+  // — this is the rule data/readings.js was hand-curated on, now mechanical.
+  const KANA_VOWEL = (() => {
+    const m = {}, rows = {
+      a: "あかがさざただなはばぱまやらわゃ", i: "いきぎしじちぢにひびぴみり",
+      u: "うくぐすずつづぬふぶぷむゆるゅ", e: "えけげせぜてでねへべぺめれ",
+      o: "おこごそぞとどのほぼぽもよろをょ"
+    };
+    Object.keys(rows).forEach(v => [...rows[v]].forEach(c => m[c] = v));
+    return m;
+  })();
+  // does this bare vowel kana lengthen the sound before it rather than add one?
+  function lengthens(v, c) {
+    return (c === "あ" && v === "a") || (c === "い" && (v === "i" || v === "e")) ||
+           (c === "う" && (v === "u" || v === "o")) ||
+           (c === "え" && v === "e") || (c === "お" && v === "o");
+  }
+  function syllables(str) {
+    const cs = [...kata2hira(str || "")];
+    let n = 0, v = null;
+    for (const c of cs) {
+      if ("ゃゅょぁぃぅぇぉ".indexOf(c) >= 0) { v = KANA_VOWEL[c] || v; continue; }
+      if (c === "ー" || c === "っ" || c === "ん") continue;   // moraic, not a syllable
+      if ("あいうえお".indexOf(c) >= 0 && lengthens(v, c)) continue;
+      n++;
+      v = KANA_VOWEL[c] || null;
+    }
+    return n;
+  }
+
+  // ---- every reading a kanji has -----------------------------------------
+  // The curated entries first — they carry a gloss and the spellings a
+  // recogniser may return — then every remaining on/kun straight off the kanji
+  // data, so 月 offers ゲツ and ガツ as well as つき. `say` marks the ones long
+  // enough to be worth asking for out loud.
+  function allReadings(ch) {
+    const k = KANJI_MAP[ch];
+    if (!k) return [];
+    const out = [], seen = {};
+    const add = rd => {
+      if (!rd.r || seen[rd.r]) return;
+      seen[rd.r] = true;
+      // Two thresholds, deliberately different. `say` is what the app picks on
+      // its own: two syllables, the conservative rule readings.js was curated
+      // on. `pin` is what it will accept when he chooses a reading himself —
+      // two morae, so さん and とお are allowed. His explicit choice outranks a
+      // heuristic; it just may not always be heard.
+      rd.say = syllables(rd.r) >= 2;
+      rd.pin = morae(rd.r) >= 2;
+      out.push(rd);
+    };
+    kanjiReadings(ch).forEach(rd => add(Object.assign({ curated: true, disp: rd.r }, rd)));
+    const raw = (list, type) => (list || []).forEach(x => {
+      const disp = (x[0] || "").replace(/[()（）]/g, "");
+      add({ r: kata2hira(disp), disp, ro: (x[1] || "").replace(/[()（）]/g, ""),
+            t: type, k: ch, curated: false });
+    });
+    raw(k.on, "on");
+    raw(k.kun, "kun");
+    return out;
+  }
+
+  // ---- which reading he wants --------------------------------------------
+  // Stored per kanji as the reading itself, not "on"/"kun", because 月 has two
+  // ON readings and he wants ガツ specifically. null = let the app choose.
+  function readingPref(ch) { return (S.readingPref && S.readingPref[ch]) || null; }
+  function setReadingPref(ch, r) {
+    if (!S.readingPref) S.readingPref = {};
+    if (r) S.readingPref[ch] = r; else delete S.readingPref[ch];
+    save();
+  }
   // is this reading of this kanji the ON or the KUN one? (used to label dictation)
   function readingType(ch, r) {
     const k = KANJI_MAP[ch];
@@ -117,19 +209,19 @@
     if (inList(k.kun)) return "kun";
     return null;
   }
-  // the two readings offered as text-to-speech on the writing prompt
+  // The two readings offered as text-to-speech on the writing prompt: one per
+  // type, and within a type the pinned one if he chose it — so pinning ガツ
+  // changes what the 音 ON button plays for 月.
   function ttsReadings(ch) {
-    const k = KANJI_MAP[ch];
-    if (!k) return [];
+    const all = allReadings(ch);
+    if (!all.length) return [];
+    const pin = readingPref(ch);
     const out = [];
-    const push = (list, type) => {
-      if (!list || !list.length) return;
-      const r = kata2hira(list[0][0]).replace(/[()（）]/g, "");
-      const ro = (list[0][1] || "").replace(/[()（）]/g, "");
-      if (r) out.push({ r, ro, t: type });
-    };
-    push(k.on, "on");
-    push(k.kun, "kun");
+    ["on", "kun"].forEach(type => {
+      const of = all.filter(r => r.t === type);
+      if (!of.length) return;
+      out.push(of.filter(r => r.r === pin)[0] || of[0]);
+    });
     return out;
   }
 
@@ -687,6 +779,7 @@
     recordDraw, recordVoice, markKnown, wantKanji, isWanted, learnQueue,
     dictationInfo, dictationMode, kanaVoiceWord,
     kanjiReadings, readingAccepts, pickReading, readingType, ttsReadings,
+    allReadings, readingPref, setReadingPref, syllables,
     katakanaUnlocked, kanjiUnlocked, refillActiveKanji, currentTrack,
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
     trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, demoteAll,

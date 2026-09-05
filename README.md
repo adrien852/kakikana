@@ -38,6 +38,16 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
+## What's new in v1.17.0
+
+- **You choose which reading a kanji is practised with.** Open it in the library: every reading it has is now a button — ON and KUN, all of them, not just the first of each. Tap one to hear it; tap it again to make it *the* reading. 月 can be **ガツ** instead of つき.
+- Your choice drives both halves of practice: the 🔊 音 ON button on the writing prompt plays the reading you picked, and the spoken exercise asks you for it.
+- Tap the chosen one once more and the app goes back to deciding for itself.
+- Very short readings (き, て, せん…) are drawn with a dashed outline. You can still pick one to listen to, but the app will not ask you to say it — one syllable is not something speech recognition can hear reliably. The line under the readings always tells you what the current choice means.
+- Readings the app would never pick on its own are available too, so you are not limited to the ones it considers safest.
+
+To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
+
 ## What's new in v1.16.0
 
 - **Back to the v1.12.0 app.** Everything added for Kakibun and KakiBridge is gone: the progress file written for the other apps, the « Jeux » library tab of kanji mined from games, the relay client and its settings card. The app is once again self-contained — nothing it does depends on another app, a PC, or a network.

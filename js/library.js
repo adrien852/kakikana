@@ -236,6 +236,48 @@
     body.querySelectorAll(".cell").forEach(c => c.onclick = () => { sfx("pop"); openKanji(c.dataset.k); });
   }
 
+  // ---------- choosing which reading to hear and to say ----------
+  // Every reading the kanji has, tappable. Tapping speaks it and pins it;
+  // tapping the pinned one again lets the app choose again. The pin drives the
+  // 🔊 buttons on the writing prompt and the reading the spoken exercise asks
+  // for — 月 can be がつ rather than つき.
+  function readingRow(ch, type) {
+    const list = Engine.allReadings(ch).filter(r => r.t === type);
+    if (!list.length) return "";
+    const pin = Engine.readingPref(ch);
+    return `<div class="kv"><div class="k">${t(type === "on" ? "onyomi" : "kunyomi")}</div>
+      <div class="read-row">${list.map(r => `
+        <button class="read-chip${r.r === pin ? " on" : ""}${r.pin ? "" : " listen-only"}" data-read="${r.r}">
+          <span class="jp">${r.disp}</span><span class="ro">${r.ro}</span>
+          <span class="tick"${r.r === pin ? "" : " hidden"}>✓</span>
+        </button>`).join("")}</div></div>`;
+  }
+  function readingNote(ch) {
+    const pin = Engine.readingPref(ch);
+    if (!pin) return t("read_auto_hint");
+    const rd = Engine.allReadings(ch).filter(r => r.r === pin)[0];
+    if (!rd) return t("read_auto_hint");
+    if (!rd.pin) return t("read_pinned_listen").replace("{r}", rd.disp);
+    const short = Engine.syllables(rd.r) < 2 ? " " + t("read_pinned_short") : "";
+    return t("read_pinned").replace("{r}", rd.disp) + short;
+  }
+  function wireReadingPicker(root, ch) {
+    root.querySelectorAll("[data-read]").forEach(b => b.onclick = () => {
+      const r = b.dataset.read;
+      if (!Voice.isListening()) Voice.speak(r);
+      Engine.setReadingPref(ch, Engine.readingPref(ch) === r ? null : r);
+      const pin = Engine.readingPref(ch);
+      root.querySelectorAll("[data-read]").forEach(x => {
+        const sel = x.dataset.read === pin;
+        x.classList.toggle("on", sel);
+        x.querySelector(".tick").hidden = !sel;
+      });
+      const note = root.querySelector("#read-note");
+      if (note) note.innerHTML = readingNote(ch);
+      sfx("tap");
+    });
+  }
+
   function openKanji(ch) {
     const k = Engine.KANJI_MAP[ch];
     const lang = Engine.state.lang;
@@ -244,8 +286,7 @@
     const active = Engine.state.kanjiActive.includes(ch);
     const wanted = Engine.isWanted(ch);
 
-    const onH = k.on.length ? `<div class="kv"><div class="k">${t("onyomi")}</div><div class="v jp">${k.on.map(r => `${r[0]} <span class="muted">(${r[1]})</span>`).join("、 ")}</div></div>` : "";
-    const kunH = k.kun.length ? `<div class="kv"><div class="k">${t("kunyomi")}</div><div class="v jp">${k.kun.map(r => `${r[0]} <span class="muted">(${r[1]})</span>`).join("、 ")}</div></div>` : "";
+    const onH = readingRow(ch, "on"), kunH = readingRow(ch, "kun");
     const words = k.w.map(w => `
       <div class="word-row">
         <div class="word-jp jp">${w[0]}</div>
@@ -281,6 +322,7 @@
       </div>
       <div class="muted" style="font-size:12.5px;margin-top:6px">${Voice.anyEngineMaybe() ? t("practice_hint") : ""}</div>
       ${onH}${kunH}
+      <div class="muted read-note" id="read-note" style="font-size:12.5px;margin:-4px 2px 10px">${readingNote(ch)}</div>
       <div class="kv"><div class="k">${t("etym")}</div>
         <div class="v"><span class="etype-tag">${t("etype_" + k.etype)}</span><br>${lang === "fr" ? k.etf : k.ete}</div></div>
       <div class="kv"><div class="k">${t("examples")}</div>${words}</div>
@@ -295,6 +337,7 @@
              <div class="muted center" style="font-size:12.5px;margin-top:6px">${t("want_learn_sub")}</div>`}
     `);
     wirePractice(document.getElementById("modal-root"));
+    wireReadingPicker(document.getElementById("modal-root"), ch);
     const wb = document.getElementById("d-want");
     if (wb) wb.onclick = () => { sfx("right"); Engine.wantKanji(ch, true); App.closeModal(); render(); };
     const wu = document.getElementById("d-want-un");
