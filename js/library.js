@@ -110,153 +110,15 @@
 
   function render() {
     const v = document.getElementById("view");
-    // the shared key may have been refreshed by Kakibun since the app booted
-    if (window.Mined) Mined.readShared();
-    const mined = window.Mined ? Mined.count() : 0;
     v.innerHTML = `<h1>${t("tab_library")}</h1>
       <div class="lib-tabs">
         <button class="lib-tab ${tab === "hiragana" ? "active" : ""}" data-t="hiragana">${t("hiragana")}</button>
         <button class="lib-tab ${tab === "katakana" ? "active" : ""}" data-t="katakana">${t("katakana")}</button>
         <button class="lib-tab ${tab === "kanji" ? "active" : ""}" data-t="kanji">${t("kanji")}</button>
-        <button class="lib-tab ${tab === "mined" ? "active" : ""}" data-t="mined">${t("lib_mined")}${
-          mined ? ` <span class="tab-n">${mined}</span>` : ""}</button>
       </div>
       <div id="lib-body"></div>`;
     v.querySelectorAll(".lib-tab").forEach(b => b.onclick = () => { sfx("tap"); tab = b.dataset.t; render(); });
-    if (tab === "kanji") renderKanji();
-    else if (tab === "mined") renderMined();
-    else renderKana(tab);
-  }
-
-  // ---------- kanji met in games (read-only, via KakiBridge) ----------
-  // These are not part of the course: most are outside the 104 and none of them
-  // ever enter a session. This is a record of what he has actually run into.
-  let minedGame = null, minedSort = "n";
-
-  function renderMined() {
-    const body = document.getElementById("lib-body");
-    if (!window.Mined || !Mined.hasData()) {
-      body.innerHTML = `<div class="card center">
-        <div style="font-size:34px">🎮</div>
-        <div class="track-title" style="margin-top:6px">${t("mined_empty_title")}</div>
-        <p class="muted" style="font-size:13px">${t("mined_empty_body")}</p>
-        <button class="btn secondary" id="mined-import">${t("mined_import")}</button>
-        <input type="file" id="mined-file" accept=".json,application/json" style="display:none">
-      </div>`;
-      wireMinedImport(body);
-      return;
-    }
-    const games = Mined.games();
-    const list = Mined.list(minedGame, minedSort);
-    const chip = (val, label, n) =>
-      `<button class="sort-chip ${(minedGame || "") === (val || "") ? "active" : ""}" data-game="${encodeURIComponent(val || "")}">${label}${
-        n !== undefined ? ` <span class="chip-n">${n}</span>` : ""}</button>`;
-    const total = games.reduce((a, g) => a + g.kanji, 0);
-    body.innerHTML = `
-      <div class="muted" style="margin-bottom:8px;font-size:12.5px">${t("mined_intro")}</div>
-      ${games.length ? `<div class="sort-row">
-        ${chip("", t("mined_all"), Mined.count())}
-        ${games.map(g => chip(g.name, g.name, g.kanji)).join("")}
-      </div>` : ""}
-      <div class="sort-row">
-        <button class="sort-chip ${minedSort === "n" ? "active" : ""}" data-sort="n">${t("mined_sort_n")}</button>
-        <button class="sort-chip ${minedSort === "recent" ? "active" : ""}" data-sort="recent">${t("mined_sort_recent")}</button>
-      </div>
-      <div class="kanji-grid">${list.map(e => minedCell(e)).join("")}</div>
-      <p class="muted center" style="font-size:12px;margin-top:12px">
-        ${list.length} ${t("mined_count")}${Mined.lastUpdate() ? ` · ${t("mined_updated")} ${
-          new Date(Mined.lastUpdate()).toLocaleDateString()}` : ""}</p>
-      <button class="btn secondary small" id="mined-import" style="margin:0 auto;display:block">${t("mined_reimport")}</button>
-      <input type="file" id="mined-file" accept=".json,application/json" style="display:none">`;
-    body.querySelectorAll("[data-game]").forEach(b => b.onclick = () => {
-      sfx("tap"); minedGame = decodeURIComponent(b.dataset.game) || null; renderMined();
-    });
-    body.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => {
-      sfx("tap"); minedSort = b.dataset.sort; renderMined();
-    });
-    body.querySelectorAll(".cell").forEach(c => c.onclick = () => { sfx("pop"); openMined(c.dataset.k); });
-    wireMinedImport(body);
-  }
-
-  function minedCell(e) {
-    const inCourse = !!Engine.KANJI_MAP[e.ch];
-    const st = inCourse ? Engine.status(e.ch) : "foreign";
-    const n = minedGame ? (e.games[minedGame] || 0) : e.n;
-    return `<div class="cell ${st}" data-k="${e.ch}">
-      <span class="dot"></span>
-      <span class="g jp" style="font-size:30px">${e.ch}</span>
-      <span class="r">×${n}</span>
-    </div>`;
-  }
-
-  function wireMinedImport(root) {
-    const btn = root.querySelector("#mined-import"), file = root.querySelector("#mined-file");
-    if (!btn || !file) return;
-    btn.onclick = () => file.click();
-    file.onchange = ev => {
-      const f = ev.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const res = Mined.importText(r.result);
-          sfx("good");
-          alert(t("mined_imported")
-            .replace("{k}", res.kanji).replace("{w}", res.words)
-            .replace("{g}", res.games.length ? res.games.join(", ") : "—"));
-          minedGame = null;
-          render();
-        } catch (err) { alert(t("mined_bad_file")); }
-      };
-      r.readAsText(f);
-    };
-  }
-
-  function openMined(ch) {
-    const e = Mined.get(ch);
-    if (!e) return;
-    const lang = Engine.state.lang;
-    const k = Engine.KANJI_MAP[ch];
-    const canDraw = !!window.STROKES[ch];
-    const st = k ? Engine.status(ch) : null;
-    // readings: what KakiBridge sent, else our own if it is one of the 104
-    const on = (e.info && e.info.on) || (k && k.on.map(x => x[0]).join(", ")) || "";
-    const kun = (e.info && e.info.kun) || (k && k.kun.map(x => x[0]).join(", ")) || "";
-    const meaning = (e.info && e.info.meaning) || (k ? (lang === "fr" ? k.fr : k.en) : "");
-    const gameRows = Object.keys(e.games).filter(g => g).sort((a, b) => e.games[b] - e.games[a])
-      .map(g => `<div class="game-row"><span>${g}</span><b>×${e.games[g]}</b></div>`).join("");
-    const words = e.words.map(w => `<div class="word-row">
-        <div class="word-jp jp">${w.w}</div>
-        <div class="word-info"><div class="word-sub">${[w.r, w.g].filter(Boolean).join(" — ")}</div>
-          ${w.game && Object.keys(e.games).length > 1 ? `<div class="muted" style="font-size:11.5px">${w.game}</div>` : ""}</div>
-        <div class="muted" style="font-size:12px">×${w.n}</div>
-        <button class="speak-btn" style="width:40px;height:40px;font-size:18px" data-say="${w.r || w.w}">🔊</button>
-      </div>`).join("");
-    App.modal(`
-      <div class="detail-head">
-        ${canDraw ? `<div class="detail-anim" id="detail-anim"></div>` : `<div class="detail-char jp">${ch}</div>`}
-        <div class="detail-meta">
-          <div class="detail-romaji"${meaning ? "" : ' style="color:var(--ink-soft);font-weight:600"'}>${
-            meaning || t("mined_no_meaning")}</div>
-          <div class="detail-fr">${t("mined_seen")} <b>×${e.n}</b></div>
-          <div class="mt8">${k
-            ? `<span class="pill ${st}">${t("status_" + st)}</span>`
-            : `<span class="pill new">${t("mined_outside")}</span>`}</div>
-        </div>
-      </div>
-      ${on || kun ? `<div class="kv"><div class="k">${t("mined_readings")}</div>
-        <div class="v jp">${[on && "音 " + on, kun && "訓 " + kun].filter(Boolean).join(" · ")}</div></div>` : ""}
-      ${gameRows ? `<div class="kv"><div class="k">${t("mined_games")}</div><div class="v">${gameRows}</div></div>` : ""}
-      ${words ? `<div class="kv"><div class="k">${t("mined_words")}</div>${words}</div>` : ""}
-      ${e.last ? `<div class="kv"><div class="k">${t("mined_last")}</div><div class="v">${
-        new Date(e.last).toLocaleDateString()}</div></div>` : ""}
-      ${k ? `<button class="btn secondary mt8" id="mined-full">${t("mined_open_full")}</button>`
-          : `<p class="muted" style="font-size:12.5px;margin-top:10px">${t("mined_note")}</p>`}
-    `, () => { if (animWriter) animWriter = null; });
-    wirePractice(document.getElementById("modal-root"));
-    const full = document.getElementById("mined-full");
-    if (full) full.onclick = () => { App.closeModal(); openKanji(ch); };
-    if (canDraw) animWriter = Drawing.animateIn(document.getElementById("detail-anim"), ch, 110);
+    if (tab === "kanji") renderKanji(); else renderKana(tab);
   }
 
   // ---------- kana tabs ----------

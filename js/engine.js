@@ -35,14 +35,7 @@
     } catch (e) {}
     return JSON.parse(JSON.stringify(DEFAULTS));
   }
-  function save() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
-    // keep the Kakibun bridge in step with every change (defined further down,
-    // so guard the very first save during module set-up)
-    if (typeof writeExport === "function") writeExport();
-    // …and let the relay know there is something new to send (debounced there)
-    if (window.Sync && Sync.pushSoon) Sync.pushSoon();
-  }
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
 
   // ---- character lists ----
   const KANJI = window.KANJI_PARTS.slice().sort((a, b) => a.d - b.d);
@@ -170,9 +163,6 @@
     if (KANJI_MAP[ch]) return "kanji";
     const c = ch.codePointAt(0);
     if (c >= 0x3040 && c <= 0x309f) return "hiragana";
-    // a kanji mined in a game is outside the 104, and must not fall through to
-    // "katakana" just because it is not in the course
-    if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf)) return "kanji";
     return "katakana";
   }
 
@@ -194,7 +184,7 @@
   function today() { return new Date().toISOString().slice(0, 10); }
 
   // Record a drawing result. unaidedOk = clean completion with no help visible.
-  function recordDraw(ch, ok, unaidedOk) {
+  function recordDraw(ch, ok, unaidedOk, skipped) {
     const p = P(ch);
     p.enc++; p.lastSeen = Date.now();
     if (p.learnedAt === null) p.learnedAt = Date.now();
@@ -212,6 +202,15 @@
       p.fail++;
       p.stage = Math.max(p.stage - 1, 0);
       p.box = Math.max(p.box - 1, 0);
+      // A mastered character you have just failed to draw has disproved its own
+      // badge — the drawing is the most direct test of it there is. A skip is
+      // not the same thing: nothing was attempted, so it only costs a box.
+      if (!skipped && (p.mastered || p.known)) {
+        clearMasteryEvidence(p);
+        // and it comes back in a couple of days, not in the fortnight its old
+        // box would have bought it
+        p.box = Math.min(p.box, DEMOTE_BOX);
+      }
     }
     p.due = Date.now() + BOX_DAYS[p.box] * DAY;
     save();
@@ -617,25 +616,34 @@
     return { total, seen, mastered, known };
   }
   // ---- losing mastery -------------------------------------------------------
-  // Missing a character in an exam is evidence it was not solid after all, so it
-  // drops back to "known": still a learned character, no longer mastered, due
-  // again straight away, and the mastery evidence starts over — otherwise the
-  // very next success would re-master it and the demotion would mean nothing.
-  function demote(ch) {
-    const p = S.chars[ch];
-    if (!p || !(p.mastered || p.known)) return false;
+  // Getting a character wrong is evidence it was not solid after all, whether
+  // that happens in an exam or in an ordinary session. It drops back to "known":
+  // still a learned character, no longer mastered, and the mastery evidence
+  // starts over — otherwise the very next success would re-master it and the
+  // demotion would mean nothing.
+  //
+  // The caller decides how soon it comes back, because the two cases differ: an
+  // exam miss makes it due immediately, a failed drawing lets the normal SRS
+  // failure maths run with the box capped (see recordDraw).
+  const DEMOTE_BOX = 2;              // ~2 days — a just-failed character is shaky
+  function clearMasteryEvidence(p) {
     p.mastered = false;
     p.known = false;
     p.unaided = 0;
     p.days = [];
-    p.box = 3;                       // status() reads box >= 3 as "known"
     p.enc = Math.max(p.enc, 1);      // a self-declared "known" char has enc 0
-    p.due = Date.now();
     if (p.learnedAt === null) p.learnedAt = Date.now();
+  }
+  function demote(ch) {
+    const p = S.chars[ch];
+    if (!p || !(p.mastered || p.known)) return false;
+    clearMasteryEvidence(p);
+    p.box = 3;                       // status() reads box >= 3 as "known"
+    p.due = Date.now();
     return true;
   }
-  // returns the characters that actually lost mastery; saves once, not per
-  // character — a failed full exam can demote seventy of them at a time
+  // returns the characters that actually lost mastery
+  // saves once, not per character — a failed full exam can demote seventy at once
   function demoteAll(chars) {
     const out = [];
     (chars || []).forEach(ch => { if (demote(ch)) out.push(ch); });
@@ -661,47 +669,6 @@
     return dueChars(all).length;
   }
 
-  // ---- the Kakibun bridge ---------------------------------------------------
-  // Kakibun (the sentence app) is served from the same origin, so it can read
-  // this key straight out of localStorage and decide which kanji to show in
-  // kanji rather than kana. It is rewritten on every save, so his progress here
-  // is current over there without any manual export.
-  //   mastered = status "mastered"   (includes "I already know this")
-  //   known    = status "known"      (box >= 3, not yet mastered)
-  //   learning = started, not yet solid
-  const EXPORT_KEY = "kakikana.export.v1";
-
-  function bucket(list, withLearning) {
-    const out = { mastered: [], known: [] };
-    if (withLearning) out.learning = [];
-    list.forEach(k => {
-      const st = status(k.k);
-      if (st === "mastered") out.mastered.push(k.k);
-      else if (st === "known") out.known.push(k.k);
-      else if (withLearning && st === "learning") out.learning.push(k.k);
-    });
-    return out;
-  }
-  function buildExport() {
-    return {
-      app: "kakikana",
-      v: 1,
-      date: new Date().toISOString(),
-      kanji: bucket(KANJI, true),
-      hiragana: bucket(HIRA_ALL, false),
-      katakana: bucket(KATA_ALL, false)
-    };
-  }
-  function exportForBridge() { return JSON.stringify(buildExport(), null, 1); }
-  // Written unconditionally on every save. Skipping identical payloads would be
-  // a false economy: it is a few hundred short strings, and if anything else ever
-  // clobbers the key, an unconditional write is what repairs it.
-  function writeExport() {
-    try {
-      localStorage.setItem(EXPORT_KEY, JSON.stringify(buildExport()));
-    } catch (e) {}          // private mode, quota — never break a save over this
-  }
-
   // ---- import / export ----
   function exportState() { return JSON.stringify(S, null, 1); }
   function importState(json) {
@@ -724,10 +691,6 @@
     buildSession, noteSessionStarted, noteSessionDone, sessionDoneToday,
     trackStats, masteryProgress, dailyProgress, masteredChars, masteredKanji, demoteAll,
     totalDue, bumpStreak,
-    exportState, importState, resetAll,
-    exportForBridge, EXPORT_KEY
+    exportState, importState, resetAll
   };
-
-  // publish once at boot, so an install that never saves still reaches Kakibun
-  writeExport();
 })();

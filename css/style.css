@@ -309,27 +309,3 @@ select, input[type=number] {
   font-size: 12px;
 }
 .miss-ch { font-size: 22px; line-height: 1; }
-/* the library's fourth tab: kanji met in games */
-.lib-tabs .tab-n, .sort-chip .chip-n {
-  display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 99px;
-  background: rgba(43,38,32,.12); font-size: 11px; font-weight: 700; margin-left: 3px;
-}
-.lib-tab.active .tab-n { background: rgba(255,255,255,.28); }
-.sort-chip.active .chip-n { background: rgba(255,255,255,.22); }
-.lib-tabs .lib-tab { font-size: 13px; padding: 10px 4px; }
-/* mined but outside the 104 — dashed, so it never reads as "learning" gold */
-.cell.foreign { border-style: dashed; border-color: #b9ad97; background: #fdfbf7; }
-.cell.foreign .dot { background: #b9ad97; }
-.game-row {
-  display: flex; justify-content: space-between; gap: 10px;
-  padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 13.5px;
-}
-.game-row:last-child { border-bottom: none; }
-/* the relay card */
-.text-in {
-  width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line);
-  background: var(--paper); color: var(--ink); font-size: 14px; font-family: inherit;
-}
-.text-in:focus { outline: none; border-color: var(--red); }
-.relay-actions { display: flex; gap: 8px; margin: 10px 0 4px; }
-.relay-actions .btn { flex: 1; }

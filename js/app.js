@@ -1,6 +1,6 @@
 // ===== App shell: navigation, i18n, home =====
 (function () {
-  window.APP_VERSION = "1.15.0";
+  window.APP_VERSION = "1.16.0";
 
   function t(key) {
     const lang = Engine.state.lang || "fr";
@@ -125,7 +125,6 @@
 
   // boot
   applyLang();
-  if (window.Sync) Sync.start();
   go("home");
   if (!Engine.state.onboarded) onboard();
 })();

@@ -150,7 +150,7 @@
       b.onclick = () => Voice.speak(b.dataset.speak));
     document.getElementById("sess-skip").onclick = () => {
       sfx("tap");
-      Engine.recordDraw(ch, false, false);
+      Engine.recordDraw(ch, false, false, true);   // skipped, not failed
       score.total++;
       if (dictation) { reveal(); Voice.speak(speakText); setTimeout(() => { if (live) { idx++; next(); } }, 1600); }
       else { idx++; next(); }
@@ -175,13 +175,17 @@
         const ok = res.totalMistakes <= Math.max(2, strokes);            // overall success
         // "unaided" now means exactly that: no guide left on screen, no hint asked for
         const unaided = plan.shown === 0 && !res.hintUsed && res.totalMistakes <= 2;
-        const wasMastered = Engine.P(ch).mastered;
+        const wasMastered = Engine.P(ch).mastered || Engine.P(ch).known;
         Engine.recordDraw(ch, ok, unaided);
-        const justMastered = !wasMastered && Engine.P(ch).mastered;
+        const nowMastered = Engine.P(ch).mastered || Engine.P(ch).known;
+        const justMastered = !wasMastered && nowMastered;
+        const lostMastery = wasMastered && !nowMastered;
         score.total++; if (ok) score.ok++;
         sfx(justMastered ? "master" : ok ? "good" : "soso");
         if (dictation) reveal();
-        flash(ok ? t("correct") : t("almost"), ok ? "good" : "bad");
+        // losing the badge is the more useful thing to say when it happens
+        flash(lostMastery ? t("mastery_lost") : ok ? t("correct") : t("almost"),
+              ok ? "good" : "bad");
         if (justMastered) masteryToast(ch);
         if (type !== "kanji") Voice.speak(speakText);
         advancing = true;
@@ -191,7 +195,7 @@
           if (!advancing || !live) return;
           if (reading) renderVoice({ ch, type: "voice", reading }, true);
           else { idx++; next(); }
-        }, justMastered ? 2200 : 1300);
+        }, justMastered ? 2200 : lostMastery ? 2000 : 1300);
       }
     }, { hintPlan: plan, dictation: !!dictation });
     // what the dictation was, shown once the answer is in (or on demand)

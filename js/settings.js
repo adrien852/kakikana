@@ -2,27 +2,6 @@
 (function () {
   function t(k) { return App.t(k); }
 
-  // "il y a 2 min" rather than a full timestamp, which wraps on a phone
-  function ago(ms) {
-    if (!ms) return null;
-    const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-    if (s < 60) return t("ago_now");
-    const m = Math.round(s / 60);
-    if (m < 60) return t("ago_min").replace("{n}", m);
-    const h = Math.round(m / 60);
-    if (h < 24) return t("ago_hour").replace("{n}", h);
-    return t("ago_day").replace("{n}", Math.round(h / 24));
-  }
-  function relayLine() {
-    const st = Sync.status();
-    if (!st.url) return t("relay_none");
-    if (st.lastErr) return "⚠ " + t("relay_failed") + " — " + st.lastErr;
-    const bits = [];
-    if (st.lastPush) bits.push(t("relay_sent") + " " + ago(st.lastPush));
-    if (st.lastPull) bits.push(t("relay_got") + " " + ago(st.lastPull));
-    return bits.length ? bits.join(" · ") : t("relay_waiting");
-  }
-
   function render() {
     const S = Engine.state;
     const st = S.settings;
@@ -110,23 +89,6 @@
         </div>
       </div>
 
-      <h2>${t("settings_relay")}</h2>
-      <div class="card">
-        <p class="muted" style="margin-top:0;font-size:12.5px">${t("relay_desc")}</p>
-        <input type="url" id="relay-url" class="text-in" placeholder="https://…/s/mon-secret"
-               value="${(Sync.status().url || "").replace(/"/g, "&quot;")}" autocomplete="off"
-               autocapitalize="off" spellcheck="false">
-        <div class="relay-actions">
-          <button class="btn secondary small" id="relay-save">${t("relay_save")}</button>
-          <button class="btn secondary small" id="relay-now">${t("relay_now")}</button>
-        </div>
-        <div class="set-row"><div class="set-lbl">${t("relay_auto")}
-          <div class="set-sub">${t("relay_auto_sub")}</div></div>
-          <label class="switch"><input type="checkbox" id="relay-auto" ${Sync.status().auto ? "checked" : ""}><span></span></label>
-        </div>
-        <div class="muted" id="relay-status" style="font-size:12.5px">${relayLine()}</div>
-      </div>
-
       <h2>${t("settings_data")}</h2>
       <div class="card">
         <div class="set-row"><div class="set-lbl">${t("export_progress")}</div>
@@ -134,13 +96,6 @@
         <div class="set-row"><div class="set-lbl">${t("import_progress")}</div>
           <button class="btn secondary small" id="btn-import">⬆︎</button>
           <input type="file" id="import-file" accept=".json,application/json" style="display:none"></div>
-        <div class="set-row"><div class="set-lbl">${t("export_bridge")}
-          <div class="set-sub">${t("export_bridge_sub")}</div></div>
-          <button class="btn secondary small" id="btn-bridge">⬇︎</button></div>
-        <div class="set-row"><div class="set-lbl">${t("mined_import")}
-          <div class="set-sub">${t("mined_import_sub")}</div></div>
-          <button class="btn secondary small" id="btn-mined">⬆︎</button>
-          <input type="file" id="mined-file-set" accept=".json,application/json" style="display:none"></div>
         <div class="set-row"><div class="set-lbl" style="color:var(--red)">${t("reset_progress")}</div>
           <button class="btn secondary small" id="btn-reset" style="color:var(--red)">🗑</button></div>
       </div>
@@ -182,45 +137,11 @@
       }
     };
 
-    // ---- relay ----
-    const rUrl = document.getElementById("relay-url");
-    const rStat = document.getElementById("relay-status");
-    const refreshLine = () => { if (rStat) rStat.textContent = relayLine(); };
-    document.getElementById("relay-save").onclick = () => {
-      const r = Sync.setUrl(rUrl.value);
-      if (!r.ok) { alert(t(r.why)); return; }
-      sfx("tap");
-      rUrl.value = r.url;
-      refreshLine();
-      if (r.url) Sync.syncNow().then(refreshLine);
-    };
-    document.getElementById("relay-now").onclick = async () => {
-      if (!Sync.configured()) { alert(t("relay_none")); return; }
-      const btn = document.getElementById("relay-now");
-      btn.disabled = true; rStat.textContent = t("relay_working");
-      const res = await Sync.syncNow();
-      btn.disabled = false;
-      refreshLine();
-      if (res.err) alert(t("relay_failed") + "\n" + res.err);
-      else if (res.mined) App.go("library");
-    };
-    document.getElementById("relay-auto").onchange = e => { Sync.setAuto(e.target.checked); refreshLine(); };
-
     document.getElementById("btn-export").onclick = () => {
       const blob = new Blob([Engine.exportState()], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "kakikana-progression-" + new Date().toISOString().slice(0, 10) + ".json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    };
-    // the same file Kakibun picks up from localStorage, for moving it by hand
-    // between browsers or devices
-    document.getElementById("btn-bridge").onclick = () => {
-      const blob = new Blob([Engine.exportForBridge()], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "kakikana-export.json";
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     };
@@ -232,22 +153,6 @@
       r.onload = () => {
         try { Engine.importState(r.result); App.applyLang(); App.go("home"); }
         catch (err) { alert("Fichier invalide / invalid file"); }
-      };
-      r.readAsText(f);
-    };
-    // KakiBridge's mined-word export → the "Jeux" tab in the library
-    document.getElementById("btn-mined").onclick = () => document.getElementById("mined-file-set").click();
-    document.getElementById("mined-file-set").onchange = e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const res = Mined.importText(r.result);
-          alert(t("mined_imported").replace("{k}", res.kanji).replace("{w}", res.words)
-            .replace("{g}", res.games.length ? res.games.join(", ") : "—"));
-          App.go("library");
-        } catch (err) { alert(t("mined_bad_file")); }
       };
       r.readAsText(f);
     };

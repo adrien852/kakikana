@@ -38,32 +38,14 @@ When you receive a new version:
 
 Tip: before big updates, export your progress from *Réglages → Données → Exporter* as an extra backup.
 
-## What's new in v1.15.0
+## What's new in v1.16.0
 
-- **The relay now lives here, in both directions.** KakiKana sends your progress up to the shared relay and pulls back the words you mined while playing. Kakibun used to do the sending half; it has no use for any of it any more, so the whole client moved across.
-- **What goes up is better than what Kakibun sent.** Kakibun could only publish a flat list of characters it had seen; KakiKana publishes the real *maîtrisé / acquis / en apprentissage* split, which is exactly what KakiBridge needs to decide whether to grey out a word inside Yomitan. That gap is closed.
-- **What comes down fills the « Jeux » tab by itself** — no file to download and import any more.
-- **Réglages → Relais**: paste the relay address, tap Enregistrer, and leave automatic sync on. A status line tells you when something last went out and came back. Sending is debounced and only happens when something actually changed; a failed attempt is retried rather than forgotten; a relay that is down never interrupts a lesson.
-- An `http://` address on your home network is refused **with the reason**: an HTTPS page cannot call plain HTTP, so it would fail silently forever. Use the relay's `https://` address.
+- **Back to the v1.12.0 app.** Everything added for Kakibun and KakiBridge is gone: the progress file written for the other apps, the « Jeux » library tab of kanji mined from games, the relay client and its settings card. The app is once again self-contained — nothing it does depends on another app, a PC, or a network.
+- **A mastered character you get wrong in an ordinary session loses its badge**, not just in an exam. Failing the drawing is the most direct test there is, so it clears the *maîtrisé* mark, resets the unaided successes and the distinct days, and puts the character back in your reviews within a couple of days. A message says so on the spot.
+- **Skipping is not failing.** A skipped character still slips back a box, as it always did, but it keeps its badge — nothing was attempted, so there is nothing to disprove.
+- Missing a character in an *exam* still demotes kana only, exactly as in v1.12.0. A practice failure applies to kana and kanji alike, because there the evidence is your own writing rather than a guess between four options.
 
-**If you still have Kakibun's sync switched on, turn it off** — both apps writing the same box would overwrite each other, and KakiKana's version is the one KakiBridge wants.
-
-To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
-
-## What's new in v1.14.0
-
-- **A fourth library tab, « Jeux »**: the kanji you have actually met while playing, collected by KakiBridge from your Yomitan lookups. Filter by game, sort by most-seen or most-recent. Tap one to see how often it came up, in which games, and the words it appeared in (with audio).
-- **Read-only, on purpose.** Most of these are far outside the 104 the course teaches, so none of them ever enter a session, an exam or your progress. It is a record of what you have run into, not a syllabus.
-- A mined kanji that *is* one of the 104 shows its usual status and links straight to its full entry; one that is not is marked "hors programme" with a dashed border.
-- **Two ways in, both optional**: the list arrives on its own from the key Kakibun writes after its own import, and *Réglages → Données → Importer un fichier KakiBridge* takes KakiBridge's export file directly. Re-importing replaces rather than adds, so counts never double.
-- The export KakiBridge reads to grey out words you already know is untouched and still written on every save.
-
-To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
-
-## What's new in v1.13.0
-
-- **KakiKana now publishes your progress for Kakibun.** Every time your progress is saved, it writes a small summary to `localStorage["kakikana.export.v1"]` — which kanji are mastered, which are known, which are still being learned, plus the same for kana. Kakibun, served from the same site, reads that key at startup and uses it to decide which words it can show in kanji rather than kana. Nothing to press: keep practising here and Kakibun keeps up.
-- **Réglages → Données → Exporter pour Kakibun** downloads the same summary as a file, for when the two apps are not in the same browser (a different device, say) and you want to carry your progress across by hand.
+Your progress is untouched by this update — it lives on the device, not in these files.
 
 To update your installed app: upload these files over the old ones in your GitHub repository (Add file → Upload files → Commit), then open the app twice.
 
